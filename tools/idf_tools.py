@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 #
-# SPDX-FileCopyrightText: 2019-2022 Espressif Systems (Shanghai) CO LTD
+# SPDX-FileCopyrightText: 2019-2023 Espressif Systems (Shanghai) CO LTD
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -125,6 +125,7 @@ class Platforms:
         'Windows-x86_64': PLATFORM_WIN64,
         'Windows-AMD64': PLATFORM_WIN64,
         'x86_64-w64-mingw32': PLATFORM_WIN64,
+        'Windows-ARM64': PLATFORM_WIN64,
         # macOS
         PLATFORM_MACOS: PLATFORM_MACOS,
         'osx': PLATFORM_MACOS,
@@ -689,6 +690,13 @@ class IDFTool(object):
         cmd = self._current_options.version_cmd  # type: ignore
         if executable_path:
             cmd[0] = executable_path
+
+        if not cmd[0]:
+            # There is no command available, so return early. It seems that
+            # within some very strange context empty [''] may actually execute
+            # something https://github.com/espressif/esp-idf/issues/11880
+            raise ToolNotFound('Tool {} not found'.format(self.name))
+
         try:
             version_cmd_result = run_cmd_check_output(cmd, None, extra_paths)
         except OSError:
@@ -2078,6 +2086,13 @@ def action_install_python_env(args):  # type: ignore
             warn('pip is not available in the existing virtual environment, new virtual environment will be created.')
             # Reinstallation of the virtual environment could help if pip was installed for the main Python
             reinstall = True
+
+        if sys.platform != 'win32':
+            try:
+                subprocess.check_call([virtualenv_python, '-c', 'import curses'], stdout=sys.stdout, stderr=sys.stderr)
+            except subprocess.CalledProcessError:
+                warn('curses can not be imported, new virtual environment will be created.')
+                reinstall = True
 
     if reinstall and os.path.exists(idf_python_env_path):
         warn('Removing the existing Python environment in {}'.format(idf_python_env_path))

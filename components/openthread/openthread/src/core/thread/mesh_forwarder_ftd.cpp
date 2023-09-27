@@ -349,8 +349,7 @@ void MeshForwarder::SendMesh(Message &aMessage, Mac::TxFrame &aFrame)
 {
     Mac::PanIds panIds;
 
-    panIds.mSource      = Get<Mac::Mac>().GetPanId();
-    panIds.mDestination = Get<Mac::Mac>().GetPanId();
+    panIds.SetBothSourceDestination(Get<Mac::Mac>().GetPanId());
 
     PrepareMacHeaders(aFrame, Mac::Frame::kTypeData, mMacAddrs, panIds, Mac::Frame::kSecurityEncMic32,
                       Mac::Frame::kKeyIdMode1, &aMessage);
@@ -498,7 +497,7 @@ exit:
     return (bestDest != Mac::kShortAddrInvalid) ? kErrorNone : kErrorNoRoute;
 }
 
-Error MeshForwarder::UpdateIp6RouteFtd(Ip6::Header &ip6Header, Message &aMessage)
+Error MeshForwarder::UpdateIp6RouteFtd(const Ip6::Header &aIp6Header, Message &aMessage)
 {
     Mle::MleRouter &mle   = Get<Mle::MleRouter>();
     Error           error = kErrorNone;
@@ -508,15 +507,15 @@ Error MeshForwarder::UpdateIp6RouteFtd(Ip6::Header &ip6Header, Message &aMessage
     {
         mMeshDest = aMessage.GetMeshDest();
     }
-    else if (mle.IsRoutingLocator(ip6Header.GetDestination()))
+    else if (mle.IsRoutingLocator(aIp6Header.GetDestination()))
     {
-        uint16_t rloc16 = ip6Header.GetDestination().GetIid().GetLocator();
+        uint16_t rloc16 = aIp6Header.GetDestination().GetIid().GetLocator();
         VerifyOrExit(mle.IsRouterIdValid(Mle::RouterIdFromRloc16(rloc16)), error = kErrorDrop);
         mMeshDest = rloc16;
     }
-    else if (mle.IsAnycastLocator(ip6Header.GetDestination()))
+    else if (mle.IsAnycastLocator(aIp6Header.GetDestination()))
     {
-        uint16_t aloc16 = ip6Header.GetDestination().GetIid().GetLocator();
+        uint16_t aloc16 = aIp6Header.GetDestination().GetIid().GetLocator();
 
         if (aloc16 == Mle::kAloc16Leader)
         {
@@ -555,25 +554,25 @@ Error MeshForwarder::UpdateIp6RouteFtd(Ip6::Header &ip6Header, Message &aMessage
             ExitNow(error = kErrorDrop);
         }
     }
-    else if ((neighbor = Get<NeighborTable>().FindNeighbor(ip6Header.GetDestination())) != nullptr)
+    else if ((neighbor = Get<NeighborTable>().FindNeighbor(aIp6Header.GetDestination())) != nullptr)
     {
         mMeshDest = neighbor->GetRloc16();
     }
-    else if (Get<NetworkData::Leader>().IsOnMesh(ip6Header.GetDestination()))
+    else if (Get<NetworkData::Leader>().IsOnMesh(aIp6Header.GetDestination()))
     {
-        SuccessOrExit(error = Get<AddressResolver>().Resolve(ip6Header.GetDestination(), mMeshDest));
+        SuccessOrExit(error = Get<AddressResolver>().Resolve(aIp6Header.GetDestination(), mMeshDest));
     }
     else
     {
         IgnoreError(
-            Get<NetworkData::Leader>().RouteLookup(ip6Header.GetSource(), ip6Header.GetDestination(), mMeshDest));
+            Get<NetworkData::Leader>().RouteLookup(aIp6Header.GetSource(), aIp6Header.GetDestination(), mMeshDest));
     }
 
     VerifyOrExit(mMeshDest != Mac::kShortAddrInvalid, error = kErrorDrop);
 
     mMeshSource = Get<Mac::Mac>().GetShortAddress();
 
-    SuccessOrExit(error = mle.CheckReachability(mMeshDest, ip6Header));
+    SuccessOrExit(error = mle.CheckReachability(mMeshDest, aIp6Header));
     aMessage.SetMeshDest(mMeshDest);
     mMacAddrs.mDestination.SetShort(mle.GetNextHop(mMeshDest));
 

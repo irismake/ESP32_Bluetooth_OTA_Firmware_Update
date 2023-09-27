@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2016-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2016-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -67,7 +67,7 @@ static void adc_dma_intr_handler(void *arg);
 
 static int8_t adc_digi_get_io_num(adc_unit_t adc_unit, uint8_t adc_channel)
 {
-    assert(adc_unit <= SOC_ADC_PERIPH_NUM);
+    assert(adc_unit < SOC_ADC_PERIPH_NUM);
     uint8_t adc_n = (adc_unit == ADC_UNIT_1) ? 0 : 1;
     return adc_channel_io_map[adc_n][adc_channel];
 }
@@ -112,6 +112,7 @@ esp_err_t adc_continuous_new_handle(const adc_continuous_handle_cfg_t *hdl_confi
     }
 
     //ringbuffer storage/struct buffer
+    adc_ctx->ringbuf_size = hdl_config->max_store_buf_size;
     adc_ctx->ringbuf_storage = heap_caps_calloc(1, hdl_config->max_store_buf_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     adc_ctx->ringbuf_struct = heap_caps_calloc(1, sizeof(StaticRingbuffer_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!adc_ctx->ringbuf_storage || !adc_ctx->ringbuf_struct) {
@@ -233,6 +234,7 @@ esp_err_t adc_continuous_new_handle(const adc_continuous_handle_cfg_t *hdl_confi
     };
     adc_hal_dma_ctx_config(&adc_ctx->hal, &config);
 
+    adc_ctx->flags.flush_pool = hdl_config->flags.flush_pool;
     adc_ctx->fsm = ADC_FSM_INIT;
     *ret_handle = adc_ctx;
 
@@ -286,7 +288,7 @@ static IRAM_ATTR void adc_dma_intr_handler(void *arg)
 
 static IRAM_ATTR bool s_adc_dma_intr(adc_continuous_ctx_t *adc_digi_ctx)
 {
-    portBASE_TYPE taskAwoken = 0;
+    BaseType_t taskAwoken = 0;
     bool need_yield = false;
     BaseType_t ret;
     adc_hal_dma_desc_status_t status = false;
@@ -313,7 +315,25 @@ static IRAM_ATTR bool s_adc_dma_intr(adc_continuous_ctx_t *adc_digi_ctx)
         }
 
         if (ret == pdFALSE) {
-            //ringbuffer overflow
+            if (adc_digi_ctx->flags.flush_pool) {
+                size_t actual_size = 0;
+                uint8_t *old_data = xRingbufferReceiveUpToFromISR(adc_digi_ctx->ringbuf_hdl, &actual_size, adc_digi_ctx->ringbuf_size);
+                /**
+                 * Replace by ringbuffer reset API when this API is ready.
+                 * Now we do mannual reset.
+                 * For old_data == NULL condition (equals to the future ringbuffer reset fail condition), we don't care this time data,
+                 * as this only happens when the ringbuffer size is small, new data will be filled in soon.
+                 */
+                if (old_data) {
+                    vRingbufferReturnItemFromISR(adc_digi_ctx->ringbuf_hdl, old_data, &taskAwoken);
+                    xRingbufferSendFromISR(adc_digi_ctx->ringbuf_hdl, finished_buffer, finished_size, &taskAwoken);
+                    if (taskAwoken == pdTRUE) {
+                        need_yield |= true;
+                    }
+                }
+            }
+
+            //ringbuffer overflow happens before
             if (adc_digi_ctx->cbs.on_pool_ovf) {
                 adc_continuous_evt_data_t edata = {};
                 if (adc_digi_ctx->cbs.on_pool_ovf(adc_digi_ctx, &edata, adc_digi_ctx->user_data)) {
@@ -593,12 +613,27 @@ esp_err_t adc_continuous_register_event_callbacks(adc_continuous_handle_t handle
     return ESP_OK;
 }
 
-esp_err_t adc_continuous_io_to_channel(int io_num, adc_unit_t *unit_id, adc_channel_t *channel)
+esp_err_t adc_continuous_flush_pool(adc_continuous_handle_t handle)
+{
+    ESP_RETURN_ON_FALSE(handle, ESP_ERR_INVALID_ARG, ADC_TAG, "invalid argument");
+    ESP_RETURN_ON_FALSE(handle->fsm == ADC_FSM_INIT, ESP_ERR_INVALID_STATE, ADC_TAG, "ADC continuous mode isn't in the init state, it's started already");
+
+    size_t actual_size = 0;
+    uint8_t *old_data = NULL;
+
+    while ((old_data = xRingbufferReceiveUpTo(handle->ringbuf_hdl, &actual_size, 0, handle->ringbuf_size))) {
+        vRingbufferReturnItem(handle->ringbuf_hdl, old_data);
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t adc_continuous_io_to_channel(int io_num, adc_unit_t * const unit_id, adc_channel_t * const channel)
 {
     return adc_io_to_channel(io_num, unit_id, channel);
 }
 
-esp_err_t adc_continuous_channel_to_io(adc_unit_t unit_id, adc_channel_t channel, int *io_num)
+esp_err_t adc_continuous_channel_to_io(adc_unit_t unit_id, adc_channel_t channel, int * const io_num)
 {
     return adc_channel_to_io(unit_id, channel, io_num);
 }

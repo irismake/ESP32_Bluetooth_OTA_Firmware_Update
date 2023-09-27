@@ -24,6 +24,7 @@ if(NOT BOOTLOADER_BUILD)
                      "intr_alloc.c"
                      "mac_addr.c"
                      "periph_ctrl.c"
+                     "revision.c"
                      "rtc_module.c"
                      "sleep_modes.c"
                      "sleep_gpio.c"
@@ -55,16 +56,18 @@ if(NOT BOOTLOADER_BUILD)
     endif()
 
     if(CONFIG_SOC_GDMA_SUPPORTED)
-        list(APPEND srcs "dma/gdma.c" "dma/async_memcpy_impl_gdma.c")
-    endif()
-
-    if(CONFIG_SOC_CP_DMA_SUPPORTED)
-        list(APPEND srcs "dma/async_memcpy_impl_cp_dma.c")
+        list(APPEND srcs "dma/gdma.c")
     endif()
 
     if(CONFIG_SOC_ASYNC_MEMCPY_SUPPORTED)
         list(APPEND srcs "dma/esp_async_memcpy.c")
-    endif()
+        if(CONFIG_SOC_GDMA_SUPPORTED)
+            list(APPEND srcs "dma/async_memcpy_gdma.c")
+        endif() # CONFIG_SOC_GDMA_SUPPORTED
+        if(CONFIG_SOC_CP_DMA_SUPPORTED)
+            list(APPEND srcs "dma/async_memcpy_cp_dma.c")
+        endif() # CONFIG_SOC_CP_DMA_SUPPORTED
+    endif() # CONFIG_SOC_ASYNC_MEMCPY_SUPPORTED
 
     if(CONFIG_SOC_GDMA_SUPPORT_ETM)
         list(APPEND srcs "dma/gdma_etm.c")
@@ -107,17 +110,24 @@ if(NOT BOOTLOADER_BUILD)
         list(APPEND srcs "modem_clock.c")
     endif()
 
-    if(CONFIG_SOC_MEMSPI_SRC_FREQ_120M)
-        list(APPEND srcs "mspi_timing_tuning.c" "port/${target}/mspi_timing_config.c")
+    if(NOT CONFIG_APP_BUILD_TYPE_PURE_RAM_APP)
+        list(APPEND srcs "mspi_timing_tuning.c" "mspi_timing_config.c")
+        if(CONFIG_SOC_MEMSPI_TIMING_TUNING_BY_MSPI_DELAY)
+            list(APPEND srcs "mspi_timing_by_mspi_delay.c")
+        endif()
     endif()
 
     if(CONFIG_SOC_RTC_FAST_MEM_SUPPORTED)
         list(APPEND srcs "sleep_wake_stub.c")
     endif()
 
-    if(CONFIG_IDF_TARGET_ESP32H2)
+    if(CONFIG_IDF_TARGET_ESP32P4)
         list(REMOVE_ITEM srcs
-                "sleep_wake_stub.c"   # TODO: IDF-6268
+                "sleep_cpu.c"         # TODO: IDF-7528, IDF-7529
+                "sleep_modes.c"       # TODO: IDF-7528, IDF-7529
+                "sleep_wake_stub.c"   # TODO: IDF-7529
+                "sleep_gpio.c"        # TODO: IDF-7528, IDF-7529
+                "port/esp_clk_tree_common.c"    # TODO: IDF-7526
             )
     endif()
 else()
@@ -130,7 +140,7 @@ idf_component_register(SRCS ${srcs}
                        PRIV_INCLUDE_DIRS port/include include/esp_private
                        REQUIRES ${requires}
                        PRIV_REQUIRES "${priv_requires}"
-                       LDFRAGMENTS linker.lf)
+                       LDFRAGMENTS linker.lf dma/linker.lf)
 
 idf_build_get_property(target IDF_TARGET)
 add_subdirectory(port/${target})

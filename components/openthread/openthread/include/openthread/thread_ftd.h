@@ -689,12 +689,12 @@ otPskcRef otThreadGetPskcRef(otInstance *aInstance);
 otError otThreadSetPskc(otInstance *aInstance, const otPskc *aPskc);
 
 /**
- * Set the Thread PSKc
+ * Set the Key Reference to the Thread PSKc
  *
  * Requires the build-time feature `OPENTHREAD_CONFIG_PLATFORM_KEY_REFERENCES_ENABLE` to be enabled.
  *
- * Will only succeed when Thread protocols are disabled.  A successful
- * call to this function will also invalidate the Active and Pending Operational Datasets in
+ * Will only succeed when Thread protocols are disabled.  Upon success,
+ * this will also invalidate the Active and Pending Operational Datasets in
  * non-volatile memory.
  *
  * @param[in]  aInstance   A pointer to an OpenThread instance.
@@ -880,6 +880,16 @@ void otThreadGetRouterIdRange(otInstance *aInstance, uint8_t *aMinRouterId, uint
  *
  */
 otError otThreadSetRouterIdRange(otInstance *aInstance, uint8_t aMinRouterId, uint8_t aMaxRouterId);
+
+/**
+ * Gets the current Interval Max value used by Advertisement trickle timer.
+ *
+ * This API requires `OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE`, and is intended for testing only.
+ *
+ * @returns The Interval Max of Advertisement trickle timer in milliseconds.
+ *
+ */
+uint32_t otThreadGetAdvertisementTrickleIntervalMax(otInstance *aInstance);
 
 /**
  * Indicates whether or not a Router ID is currently allocated.

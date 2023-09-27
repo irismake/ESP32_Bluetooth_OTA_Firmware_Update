@@ -7,6 +7,7 @@
 #ifndef _MQTT_CLIENT_PRIV_H_
 #define _MQTT_CLIENT_PRIV_H_
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdatomic.h>
@@ -38,6 +39,14 @@
 extern "C" {
 #endif
 
+#if CONFIG_NEWLIB_NANO_FORMAT
+#define NEWLIB_NANO_COMPAT_FORMAT            PRIu32
+#define NEWLIB_NANO_COMPAT_CAST(size_t_var)  (uint32_t)size_t_var
+#else
+#define NEWLIB_NANO_COMPAT_FORMAT            "zu"
+#define NEWLIB_NANO_COMPAT_CAST(size_t_var)  size_t_var
+#endif
+
 #ifdef MQTT_DISABLE_API_LOCKS
 # define MQTT_API_LOCK(c)
 # define MQTT_API_UNLOCK(c)
@@ -48,21 +57,16 @@ extern "C" {
 
 typedef struct mqtt_state {
     uint8_t *in_buffer;
-    uint8_t *out_buffer;
     int in_buffer_length;
-    int out_buffer_length;
     size_t message_length;
     size_t in_buffer_read_len;
-    mqtt_message_t *outbound_message;
-    mqtt_connection_t mqtt_connection;
+    mqtt_connection_t connection;
     uint16_t pending_msg_id;
     int pending_msg_type;
     int pending_publish_qos;
-    int pending_msg_count;
 } mqtt_state_t;
 
 typedef struct {
-    mqtt_event_callback_t event_handle;
     esp_event_loop_handle_t event_loop_handle;
     int task_stack;
     int task_prio;
@@ -89,9 +93,13 @@ typedef struct {
     size_t clientkey_bytes;
     const struct psk_key_hint *psk_hint_key;
     bool skip_cert_common_name_check;
+    const char *common_name;
     bool use_secure_element;
     void *ds_data;
     int message_retransmit_timeout;
+    uint64_t outbox_limit;
+    esp_transport_handle_t transport;
+    struct ifreq * if_name;
 } mqtt_config_storage_t;
 
 typedef enum {
@@ -106,7 +114,6 @@ struct esp_mqtt_client {
     esp_transport_handle_t transport;
     mqtt_config_storage_t *config;
     mqtt_state_t  mqtt_state;
-    mqtt_connect_info_t connect_info;
     mqtt_client_state_t state;
     uint64_t refresh_connection_tick;
     int64_t keepalive_tick;

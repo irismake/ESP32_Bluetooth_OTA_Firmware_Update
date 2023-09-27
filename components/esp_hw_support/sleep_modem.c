@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -275,7 +275,7 @@ inline __attribute__((always_inline)) bool sleep_modem_wifi_modem_link_done(void
 
 #endif /* SOC_PM_SUPPORT_PMU_MODEM_STATE */
 
-bool IRAM_ATTR modem_domain_pd_allowed(void)
+bool modem_domain_pd_allowed(void)
 {
 #if SOC_PM_MODEM_RETENTION_BY_REGDMA
     const uint32_t modules = sleep_retention_get_modules();
@@ -337,7 +337,7 @@ esp_err_t sleep_modem_configure(int max_freq_mhz, int min_freq_mhz, bool light_s
     return ESP_OK;
 }
 
-#define PERIPH_INFORM_OUT_LIGHT_SLEEP_OVERHEAD_NO 1
+#define PERIPH_INFORM_OUT_LIGHT_SLEEP_OVERHEAD_NO 2
 
 /* Inform peripherals of light sleep wakeup overhead time */
 static inform_out_light_sleep_overhead_cb_t s_periph_inform_out_light_sleep_overhead_cb[PERIPH_INFORM_OUT_LIGHT_SLEEP_OVERHEAD_NO];

@@ -489,6 +489,19 @@
 #endif
 
 /**
+ * \def MBEDTLS_ECP_FIXED_POINT_OPTIM
+ *
+ * Enable speed up fixed-point multiplication.
+ *
+ * Comment this macro to disable FIXED POINT curves optimisation.
+ */
+#ifdef CONFIG_MBEDTLS_ECP_FIXED_POINT_OPTIM
+#define MBEDTLS_ECP_FIXED_POINT_OPTIM 1
+#else
+#define MBEDTLS_ECP_FIXED_POINT_OPTIM 0
+#endif
+
+/**
  * \def MBEDTLS_ECDSA_DETERMINISTIC
  *
  * Enable deterministic ECDSA (RFC 6979).
@@ -2843,10 +2856,10 @@
 #undef MBEDTLS_SSL_CID_OUT_LEN_MAX
 #endif
 
-/** \def MBEDTLS_SSL_CID_PADDING_GRANULARITY
+/** \def MBEDTLS_SSL_CID_TLS1_3_PADDING_GRANULARITY
  *
  * This option controls the use of record plaintext padding
- * when using the Connection ID extension in DTLS 1.2.
+ * in TLS 1.3 and when using the Connection ID extension in DTLS 1.2.
  *
  * The padding will always be chosen so that the length of the
  * padded plaintext is a multiple of the value of this option.
@@ -2858,10 +2871,10 @@
  *       a power of two should be preferred.
  *
  */
-#ifdef CONFIG_MBEDTLS_SSL_DTLS_CONNECTION_ID
-#define MBEDTLS_SSL_CID_PADDING_GRANULARITY    CONFIG_MBEDTLS_SSL_CID_PADDING_GRANULARITY
+#ifdef CONFIG_MBEDTLS_SSL_CID_PADDING_GRANULARITY
+#define MBEDTLS_SSL_CID_TLS1_3_PADDING_GRANULARITY    CONFIG_MBEDTLS_SSL_CID_PADDING_GRANULARITY
 #else
-#undef MBEDTLS_SSL_CID_PADDING_GRANULARITY
+#undef MBEDTLS_SSL_CID_TLS1_3_PADDING_GRANULARITY
 #endif
 
 
@@ -2996,7 +3009,7 @@
 #endif
 
 /* This flag makes sure that we are not using
- * any functino that is deprecated by mbedtls */
+ * any function that is deprecated by mbedtls */
 #define MBEDTLS_DEPRECATED_REMOVED
 
 #endif /* ESP_CONFIG_H */

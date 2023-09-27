@@ -8,9 +8,12 @@ set(kernel_dir "${original_freertos_dir}/FreeRTOS-Kernel")
 
 set(include_dirs
     "${kernel_dir}/include"
+    "${original_freertos_dir}/config/include" # For "freertos/FreeRTOSConfig.h"
+    "${original_freertos_dir}/config/include/freertos" # For "FreeRTOSConfig.h"
+    "${original_freertos_dir}/config/linux/include" # For "freertos/FreeRTOSConfig_arch.h"
     "${original_freertos_dir}/esp_additions/include"
+    # Required because CMock tries to include "idf_additions.h" instead of "freertos/idf_additions.h"
     "${original_freertos_dir}/esp_additions/include/freertos"
-    "${original_freertos_dir}/esp_additions/arch/linux/include" # For "freertos/FreeRTOSConfig_arch.h"
     "${kernel_dir}/portable/linux/include" # For "freertos/portmacro.h"
     "${kernel_dir}/include/freertos" # this is due to the way includes are generated in CMock (without freertos prefix)
 )
@@ -18,6 +21,7 @@ set(include_dirs
 idf_component_mock(INCLUDE_DIRS ${include_dirs}
     REQUIRES esp_common
     MOCK_HEADER_FILES
+    ${original_freertos_dir}/esp_additions/include/freertos/idf_additions.h
     ${original_freertos_dir}/FreeRTOS-Kernel/include/freertos/task.h
     ${original_freertos_dir}/FreeRTOS-Kernel/include/freertos/event_groups.h
     ${original_freertos_dir}/FreeRTOS-Kernel/include/freertos/queue.h)

@@ -7,6 +7,7 @@ System API
     :maxdepth: 1
 
     app_image_format
+    bootloader_image_format
     app_trace
     esp_function_with_shared_stack
     chip_revision
@@ -23,7 +24,7 @@ System API
     heap_debug
     esp_timer
     internal-unstable
-    :not CONFIG_FREERTOS_UNICORE: ipc
+    :not CONFIG_FREERTOS_UNICORE or esp32p4: ipc
     intr_alloc
     log
     misc_system_api
@@ -39,6 +40,7 @@ System API
     :esp32: himem
     :SOC_ULP_FSM_SUPPORTED: ulp
     :SOC_RISCV_COPROC_SUPPORTED: ulp-risc-v
+    :SOC_LP_CORE_SUPPORTED: ulp-lp-core
     wdts
 
 

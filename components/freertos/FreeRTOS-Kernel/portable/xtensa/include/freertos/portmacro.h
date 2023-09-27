@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: MIT
  *
- * SPDX-FileContributor: 2016-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileContributor: 2016-2023 Espressif Systems (Shanghai) CO LTD
  */
 /*
  * FreeRTOS Kernel V10.4.3
@@ -209,7 +209,7 @@ static inline void vPortClearInterruptMaskFromISR(UBaseType_t prev_level);
  * - See "Critical Sections & Disabling Interrupts" in docs/api-guides/freertos-smp.rst for more details
  * - Remark: For the ESP32, portENTER_CRITICAL and portENTER_CRITICAL_ISR both alias vPortEnterCritical, meaning that
  *           either function can be called both from ISR as well as task context. This is not standard FreeRTOS
- *           behaviorr; please keep this in mind if you need any compatibility with other FreeRTOS implementations.
+ *           behavior; please keep this in mind if you need any compatibility with other FreeRTOS implementations.
  * @note [refactor-todo] Check if these comments are still true
  * ------------------------------------------------------ */
 
@@ -406,6 +406,19 @@ void vPortSetStackWatchpoint( void *pxStackStart );
  */
 FORCE_INLINE_ATTR BaseType_t xPortGetCoreID(void);
 
+// --------------------- TCB Cleanup -----------------------
+
+/**
+ * @brief TCB cleanup hook
+ *
+ * The portCLEAN_UP_TCB() macro is called in prvDeleteTCB() right before a
+ * deleted task's memory is freed. We map that macro to this internal function
+ * so that IDF FreeRTOS ports can inject some task pre-deletion operations.
+ *
+ * @note We can't use vPortCleanUpTCB() due to API compatibility issues. See
+ * CONFIG_FREERTOS_ENABLE_STATIC_TASK_CLEAN_UP. Todo: IDF-8097
+ */
+void vPortTCBPreDeleteHook( void *pxTCB );
 
 
 /* ------------------------------------------- FreeRTOS Porting Interface ----------------------------------------------
@@ -525,11 +538,7 @@ extern void _frxt_setup_switch( void );     //Defined in portasm.S
 
 // --------------------- TCB Cleanup -----------------------
 
-#if CONFIG_FREERTOS_ENABLE_STATIC_TASK_CLEAN_UP
-/* If enabled, users must provide an implementation of vPortCleanUpTCB() */
-extern void vPortCleanUpTCB ( void *pxTCB );
-#define portCLEAN_UP_TCB( pxTCB )                   vPortCleanUpTCB( pxTCB )
-#endif /* CONFIG_FREERTOS_ENABLE_STATIC_TASK_CLEAN_UP */
+#define portCLEAN_UP_TCB( pxTCB ) vPortTCBPreDeleteHook( pxTCB )
 
 // -------------- Optimized Task Selection -----------------
 
@@ -637,13 +646,6 @@ FORCE_INLINE_ATTR BaseType_t xPortGetCoreID(void)
  * - Miscellaneous porting macros
  * - These are not part of the FreeRTOS porting interface, but are used by other FreeRTOS dependent components
  * ------------------------------------------------------------------------------------------------------------------ */
-
-// -------------------- Co-Processor -----------------------
-
-#if XCHAL_CP_NUM > 0
-void vPortCleanUpCoprocArea(void *pvTCB);
-#define portCLEAN_UP_COPROC(pvTCB)      vPortCleanUpCoprocArea(pvTCB)
-#endif
 
 // -------------------- Heap Related -----------------------
 

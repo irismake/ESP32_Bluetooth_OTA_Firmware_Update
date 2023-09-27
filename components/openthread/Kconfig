@@ -39,6 +39,13 @@ menu "OpenThread"
             string "OpenThread network name"
             default "OpenThread-ESP"
 
+        config OPENTHREAD_MESH_LOCAL_PREFIX
+            string "OpenThread mesh local prefix, format <address>/<plen>"
+            default "fd00:db8:a0:0::/64"
+            help
+                A string in the format "<address>/<plen>", where `<address>` is an IPv6
+                address and `<plen>` is a prefix length. For example "fd00:db8:a0:0::/64"
+
         config OPENTHREAD_NETWORK_CHANNEL
             int "OpenThread network channel"
             range 11 26
@@ -200,11 +207,19 @@ menu "OpenThread"
         help
             Select this option to enable border router features in OpenThread.
 
+    config OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT
+        bool 'Allocate message pool buffer from PSRAM'
+        depends on OPENTHREAD_ENABLED && (SPIRAM_USE_CAPS_ALLOC || SPIRAM_USE_MALLOC)
+        default n
+        help
+            If enabled, the message pool is managed by platform defined logic.
+
     config OPENTHREAD_NUM_MESSAGE_BUFFERS
         int "The number of openthread message buffers"
         depends on OPENTHREAD_ENABLED
         default 65
-        range 50 100
+        range 10 100 if !OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT
+        range 10 8191 if OPENTHREAD_PLATFORM_MSGPOOL_MANAGEMENT
 
     config OPENTHREAD_DNS64_CLIENT
         bool "Use dns64 client"

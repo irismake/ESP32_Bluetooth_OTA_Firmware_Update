@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -232,13 +232,13 @@ static esp_err_t spi_master_init_driver(spi_host_device_t host_id)
     // interrupts are not allowed on SPI1 bus
     if (host_id != SPI1_HOST) {
 #if (SOC_CPU_CORES_NUM > 1) && (!CONFIG_FREERTOS_UNICORE)
-        if(bus_attr->bus_cfg.isr_cpu_id > INTR_CPU_ID_AUTO) {
-            SPI_CHECK(bus_attr->bus_cfg.isr_cpu_id <= INTR_CPU_ID_1, "invalid core id", ESP_ERR_INVALID_ARG);
+        if (bus_attr->bus_cfg.isr_cpu_id > ESP_INTR_CPU_AFFINITY_AUTO) {
+            SPI_CHECK(bus_attr->bus_cfg.isr_cpu_id <= ESP_INTR_CPU_AFFINITY_1, "invalid core id", ESP_ERR_INVALID_ARG);
             spi_ipc_param_t ipc_arg = {
                 .spi_host = host,
                 .err = &err,
             };
-            esp_ipc_call_blocking(INTR_CPU_CONVERT_ID(bus_attr->bus_cfg.isr_cpu_id), ipc_isr_reg_to_core, (void *) &ipc_arg);
+            esp_ipc_call_blocking(ESP_INTR_CPU_AFFINITY_TO_CORE_ID(bus_attr->bus_cfg.isr_cpu_id), ipc_isr_reg_to_core, (void *) &ipc_arg);
         } else
 #endif
         {
@@ -1042,10 +1042,14 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_start(spi_device_handle_t handl
     if (ret!=ESP_OK) return ret;
     SPI_CHECK(!spi_bus_device_is_polling(handle), "Cannot send polling transaction while the previous polling transaction is not terminated.", ESP_ERR_INVALID_STATE );
 
+    spi_host_t *host = handle->host;
+    spi_trans_priv_t priv_polling_trans;
+    ret = setup_priv_desc(trans_desc, &priv_polling_trans, (host->bus_attr->dma_enabled));
+    if (ret!=ESP_OK) return ret;
+
     /* If device_acquiring_lock is set to handle, it means that the user has already
      * acquired the bus thanks to the function `spi_device_acquire_bus()`.
      * In that case, we don't need to take the lock again. */
-    spi_host_t *host = handle->host;
     if (host->device_acquiring_lock != handle) {
         /* The user cannot ask for the CS to keep active has the bus is not locked/acquired. */
         if ((trans_desc->flags & SPI_TRANS_CS_KEEP_ACTIVE) != 0) {
@@ -1056,13 +1060,15 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_start(spi_device_handle_t handl
     } else {
         ret = spi_bus_lock_wait_bg_done(handle->dev_lock, ticks_to_wait);
     }
-    if (ret != ESP_OK) return ret;
-
-    ret = setup_priv_desc(trans_desc, &host->cur_trans_buf, (host->bus_attr->dma_enabled));
-    if (ret!=ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        uninstall_priv_desc(&priv_polling_trans);
+        ESP_LOGE(SPI_TAG, "polling can't get buslock");
+        return ret;
+    }
 
     //Polling, no interrupt is used.
     host->polling = true;
+    host->cur_trans_buf = priv_polling_trans;
 
     ESP_LOGV(SPI_TAG, "polling trans");
     spi_new_trans(handle, &host->cur_trans_buf);

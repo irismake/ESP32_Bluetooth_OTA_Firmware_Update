@@ -13,7 +13,7 @@ Overview
 
 The driver allows you to use {IDF_TARGET_NAME} chips to develop USB devices on a top of TinyUSB stack. TinyUSB is integrated with ESP-IDF to provide USB features of the framework. Using this driver the chip works as simple or composite device supporting several USB devices simultaneously.
 
-TinyUSB stack is distributed via `IDF Component Registry <https://components.espressif.com/components/espressif/esp_tinyusb>`_.
+TinyUSB stack is distributed via `IDF Component Registry <https://components.espressif.com/components/espressif/esp_tinyusb>`__.
 
 Our USB-OTG implementation is limited to {IDF_TARGET_USB_EP_NUM} USB endpoints ({IDF_TARGET_USB_EP_NUM_INOUT} IN/OUT endpoints and {IDF_TARGET_USB_EP_NUM_IN} IN endpoint) . Please note that enabling Secure Boot or flash encryption disables the USB-OTG USB stack in the ROM, disallowing updates via the serial emulation or Device Firmware Update (DFU) on that port. For more details, please refer to `technical reference manual <{IDF_TARGET_TRM_EN_URL}>`_.
 
@@ -24,6 +24,7 @@ Features
 - USB Serial Device (CDC-ACM)
 - Input and output streams through USB Serial Device
 - Other USB classes (MIDI, MSC, HID...) support directly via TinyUSB
+- USB Composite Device (MSC + CDC)
 - VBUS monitoring for self-powered devices
 
 Hardware USB Connection
@@ -53,10 +54,17 @@ On top of it the driver implements:
 - Customization of USB descriptors
 - Serial device support
 - Redirecting of standard streams through the Serial device
+- Storage Media (SPI-Flash and SD-Card) for USB Device MSC Class.
 - Encapsulated driver's task servicing the TinyUSB
 
 Configuration
 -------------
+
+To use the component, you need to add it as a dependency via the following command. For more details, please refer to `IDF Component Registry <https://components.espressif.com/components/espressif/esp_tinyusb>`__.
+
+.. code:: bash
+
+  idf.py add-dependency esp_tinyusb
 
 Via Menuconfig options you can specify:
 
@@ -221,3 +229,5 @@ The table below describes the code examples available in the directory :example:
      - How to set up {IDF_TARGET_NAME} chip to work as a USB Human Interface Device
    * - :example:`peripherals/usb/device/tusb_msc`
      - How to set up {IDF_TARGET_NAME} chip to work as a USB Mass Storage Device
+   * - :example:`peripherals/usb/device/tusb_composite_msc_serialdevice`
+     - How to set up {IDF_TARGET_NAME} chip to work as a Composite USB Device (MSC + CDC)

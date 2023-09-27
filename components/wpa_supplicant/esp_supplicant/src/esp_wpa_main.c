@@ -28,7 +28,7 @@
 #include "esp_wifi_driver.h"
 #include "esp_private/wifi.h"
 #include "esp_wpa3_i.h"
-#include "esp_wpa2.h"
+#include "esp_eap_client.h"
 #include "esp_common_i.h"
 #include "esp_owe_i.h"
 
@@ -38,6 +38,7 @@
 #include "ap/ieee802_1x.h"
 #include "ap/sta_info.h"
 #include "wps/wps_defs.h"
+#include "wps/wps.h"
 
 const wifi_osi_funcs_t *wifi_funcs;
 struct wpa_funcs *wpa_cb;
@@ -179,13 +180,15 @@ void wpa_ap_get_peer_spp_msg(void *sm_data, bool *spp_cap, bool *spp_req)
     *spp_req = sm->spp_sup.require;
 }
 
-bool  wpa_deattach(void)
+bool wpa_deattach(void)
 {
     struct wpa_sm *sm = &gWpaSm;
     esp_wpa3_free_sae_data();
-    if (sm->wpa_sm_wpa2_ent_disable) {
-        sm->wpa_sm_wpa2_ent_disable();
+#ifdef CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT
+    if (sm->wpa_sm_eap_disable) {
+        sm->wpa_sm_eap_disable();
     }
+#endif
     if (sm->wpa_sm_wps_disable) {
         sm->wpa_sm_wps_disable();
     }
@@ -278,6 +281,13 @@ static int check_n_add_wps_sta(struct hostapd_data *hapd, struct sta_info *sta_i
     /* Condition for this, WPS is running and WPS IEs are part of assoc req */
     if (!wps_ie || (wps_type == WPS_TYPE_DISABLE)) {
         return 0;
+    }
+
+    if (wps_type == WPS_TYPE_PBC) {
+        if (esp_wps_registrar_check_pbc_overlap(hapd->wps)) {
+            wpa_printf(MSG_DEBUG, "WPS: PBC session overlap detected");
+            return -1;
+        }
     }
 
     sta_info->wps_ie = wps_ie;

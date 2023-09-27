@@ -61,7 +61,8 @@ def run_idf_py(*args: str,
                idf_path: typing.Optional[typing.Union[str,Path]] = None,
                workdir: typing.Optional[str] = None,
                check: bool = True,
-               python: typing.Optional[str] = None) -> subprocess.CompletedProcess:
+               python: typing.Optional[str] = None,
+               input_str: typing.Optional[str] = None) -> subprocess.CompletedProcess:
     """
     Run idf.py command with given arguments, raise an exception on failure
     :param args: arguments to pass to idf.py
@@ -70,19 +71,19 @@ def run_idf_py(*args: str,
     :param workdir: directory where to run the build; if not set, the current directory is used
     :param check: check process exits with a zero exit code, if false all retvals are accepted without failing the test
     :param python: absolute path to python interpreter
+    :param input_str: input to idf.py
     """
-    env_dict = dict(**os.environ)
-    if env is not None:
-        env_dict.update(env)
+    if not env:
+        env = dict(**os.environ)
     if not workdir:
         workdir = os.getcwd()
     # order: function argument -> value in env dictionary -> system environment
     if idf_path is None:
-        idf_path = env_dict.get('IDF_PATH')
+        idf_path = env.get('IDF_PATH')
         if not idf_path:
             raise ValueError('IDF_PATH must be set in the env array if idf_path argument is not set')
     if python is None:
-        python = find_python(env_dict['PATH'])
+        python = find_python(env['PATH'])
 
     cmd = [
         python,
@@ -91,28 +92,37 @@ def run_idf_py(*args: str,
     cmd += args  # type: ignore
     logging.debug('running {} in {}'.format(' '.join(cmd), workdir))
     return subprocess.run(
-        cmd, env=env_dict, cwd=workdir,
+        cmd, env=env, cwd=workdir,
         check=check, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, encoding='utf-8', errors='backslashreplace')
+        text=True, encoding='utf-8', errors='backslashreplace', input=input_str)
 
 
-def run_cmake(*cmake_args: str, env: typing.Optional[EnvDict] = None,
-              check: bool = True) -> subprocess.CompletedProcess:
+def run_cmake(*cmake_args: str,
+              env: typing.Optional[EnvDict] = None,
+              check: bool = True,
+              workdir: typing.Optional[Union[Path,str]] = None) -> subprocess.CompletedProcess:
     """
     Run cmake command with given arguments, raise an exception on failure
     :param cmake_args: arguments to pass cmake
     :param env: environment variables to run the cmake with; if not set, the default environment is used
+    :param check: check process exits with a zero exit code, if false all retvals are accepted without failing the test
+    :param workdir: directory where to run cmake; if not set, the current directory is used
     """
     if not env:
         env = dict(**os.environ)
-    workdir = (Path(os.getcwd()) / 'build')
-    workdir.mkdir(parents=True, exist_ok=True)
+
+    if workdir:
+        build_dir = Path(workdir, 'build')
+    else:
+        build_dir = (Path(os.getcwd()) / 'build')
+
+    build_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = ['cmake'] + list(cmake_args)
 
-    logging.debug('running {} in {}'.format(' '.join(cmd), workdir))
+    logging.debug('running {} in {}'.format(' '.join(cmd), build_dir))
     return subprocess.run(
-        cmd, env=env, cwd=workdir,
+        cmd, env=env, cwd=build_dir,
         check=check, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding='utf-8', errors='backslashreplace')
 
@@ -139,3 +149,14 @@ def file_contains(filename: Union[str, Path], what: Union[str, Pattern]) -> bool
             return what in data
         else:
             return re.search(what, data) is not None
+
+
+def bin_file_contains(filename: Union[str, Path], what: bytearray) -> bool:
+    """
+    Returns true if the binary file contains the given string
+    :param filename: path to file where lookup is executed
+    :param what: searched bytes
+    """
+    with open(filename, 'rb') as f:
+        data = f.read()
+        return data.find(what) != -1

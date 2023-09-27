@@ -118,7 +118,7 @@ static esp_err_t iperf_start_report(void)
     return ESP_OK;
 }
 
-static void socket_recv(int recv_socket, struct sockaddr_storage listen_addr, uint8_t type)
+static void IRAM_ATTR socket_recv(int recv_socket, struct sockaddr_storage listen_addr, uint8_t type)
 {
     bool iperf_recv_start = true;
     uint8_t *buffer;
@@ -149,7 +149,7 @@ static void socket_recv(int recv_socket, struct sockaddr_storage listen_addr, ui
     }
 }
 
-static void socket_send(int send_socket, struct sockaddr_storage dest_addr, uint8_t type, int bw_lim)
+static void IRAM_ATTR socket_send(int send_socket, struct sockaddr_storage dest_addr, uint8_t type, int bw_lim)
 {
     uint8_t *buffer;
     int32_t *pkt_id_p;
@@ -222,7 +222,7 @@ static void socket_send(int send_socket, struct sockaddr_storage dest_addr, uint
     }
 }
 
-static esp_err_t IRAM_ATTR iperf_run_tcp_server(void)
+static esp_err_t iperf_run_tcp_server(void)
 {
     int listen_socket = -1;
     int client_socket = -1;
@@ -288,7 +288,7 @@ static esp_err_t IRAM_ATTR iperf_run_tcp_server(void)
     setsockopt(listen_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     client_socket = accept(listen_socket, (struct sockaddr *)&remote_addr, &addr_len);
     ESP_GOTO_ON_FALSE((client_socket >= 0), ESP_FAIL, exit, TAG, "Unable to accept connection: errno %d", errno);
-    ESP_LOGI(TAG, "accept: %s,%d\n", inet_ntoa(remote_addr.sin_addr), htons(remote_addr.sin_port));
+    ESP_LOGI(TAG, "accept: %s,%d", inet_ntoa(remote_addr.sin_addr), htons(remote_addr.sin_port));
 
     timeout.tv_sec = IPERF_SOCKET_RX_TIMEOUT;
     setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
@@ -389,7 +389,7 @@ exit:
     return ret;
 }
 
-static esp_err_t IRAM_ATTR iperf_run_udp_server(void)
+static esp_err_t iperf_run_udp_server(void)
 {
     int listen_socket = -1;
     int opt = 1;

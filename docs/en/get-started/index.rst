@@ -142,6 +142,14 @@ If you have one of {IDF_TARGET_NAME} official development boards listed below, y
 
         ESP8684-DevKitM-1 <https://docs.espressif.com/projects/espressif-esp-dev-kits/en/latest/esp8684/esp8684-devkitm-1/index.html>
 
+.. only:: esp32c6
+
+    .. toctree::
+        :maxdepth: 1
+
+        ESP32-C6-DevKitC-1 <https://docs.espressif.com/projects/espressif-esp-dev-kits/en/latest/esp32c6/esp32-c6-devkitc-1/index.html>
+        ESP32-C6-DevKitM-1 <https://docs.espressif.com/projects/espressif-esp-dev-kits/en/latest/esp32c6/esp32-c6-devkitm-1/index.html>
+
 .. _get-started-get-prerequisites:
 
 Software
@@ -191,3 +199,8 @@ Build Your First Project
 If you already have the ESP-IDF installed and not using IDE, you can build your first project from the command line following the :ref:`Start a Project on Windows <get-started-windows-first-steps>` or :ref:`Start a Project on Linux and macOS <get-started-linux-macos-first-steps>`.
 
 .. _Stable version: https://docs.espressif.com/projects/esp-idf/en/stable/
+
+Uninstall ESP-IDF
+=================
+
+If you want to remove ESP-IDF, please follow :ref:`idf-tools-uninstall`.

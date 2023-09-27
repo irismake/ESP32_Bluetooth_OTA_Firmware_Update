@@ -11,8 +11,8 @@
 #include "esp_openthread_dns64.h"
 #include "esp_openthread_lock.h"
 #include "esp_openthread_platform.h"
-#include "esp_openthread_state.h"
 #include "esp_openthread_sleep.h"
+#include "esp_openthread_state.h"
 #include "esp_openthread_task_queue.h"
 #include "esp_openthread_types.h"
 #include "freertos/FreeRTOS.h"
@@ -21,6 +21,10 @@
 #include "openthread/netdata.h"
 #include "openthread/tasklet.h"
 #include "openthread/thread.h"
+
+#if CONFIG_OPENTHREAD_FTD
+#include "openthread/dataset_ftd.h"
+#endif
 
 static int hex_digit_to_int(char hex)
 {
@@ -87,13 +91,14 @@ esp_err_t esp_openthread_auto_start(otOperationalDatasetTlvs *datasetTlvs)
     if (datasetTlvs) {
         ESP_RETURN_ON_FALSE(otDatasetSetActiveTlvs(instance, datasetTlvs) == OT_ERROR_NONE, ESP_FAIL, OT_PLAT_LOG_TAG,
                             "Failed to set OpenThread active dataset");
-    }
-    else {
+    } else {
         otOperationalDataset dataset;
         size_t len = 0;
-
+#if CONFIG_OPENTHREAD_FTD
+        otDatasetCreateNewNetwork(instance, &dataset);
+#else
         memset(&dataset, 0, sizeof(otOperationalDataset));
-
+#endif
         // Active timestamp
         dataset.mActiveTimestamp.mSeconds = 1;
         dataset.mActiveTimestamp.mTicks = 0;
@@ -107,7 +112,7 @@ esp_err_t esp_openthread_auto_start(otOperationalDatasetTlvs *datasetTlvs)
         dataset.mComponents.mIsPanIdPresent = true;
         len = strlen(CONFIG_OPENTHREAD_NETWORK_NAME);
         assert(len <= OT_NETWORK_NAME_MAX_SIZE);
-        memcpy(dataset.mNetworkName.m8, CONFIG_OPENTHREAD_NETWORK_NAME, len);
+        memcpy(dataset.mNetworkName.m8, CONFIG_OPENTHREAD_NETWORK_NAME, len + 1);
         dataset.mComponents.mIsNetworkNamePresent = true;
 
         // Extended Pan ID
@@ -116,6 +121,16 @@ esp_err_t esp_openthread_auto_start(otOperationalDatasetTlvs *datasetTlvs)
         ESP_RETURN_ON_FALSE(len == sizeof(dataset.mExtendedPanId.m8), ESP_FAIL, OT_PLAT_LOG_TAG,
                             "Cannot convert OpenThread extended pan id");
         dataset.mComponents.mIsExtendedPanIdPresent = true;
+
+        // Mesh Local Prefix
+        otIp6Prefix prefix;
+        memset(&prefix, 0, sizeof(otIp6Prefix));
+        if (otIp6PrefixFromString(CONFIG_OPENTHREAD_MESH_LOCAL_PREFIX, &prefix) == OT_ERROR_NONE) {
+            memcpy(dataset.mMeshLocalPrefix.m8, prefix.mPrefix.mFields.m8, sizeof(dataset.mMeshLocalPrefix.m8));
+            dataset.mComponents.mIsMeshLocalPrefixPresent = true;
+        } else {
+            ESP_LOGE("Falied to parse mesh local prefix", CONFIG_OPENTHREAD_MESH_LOCAL_PREFIX);
+        }
 
         // Network Key
         len = hex_string_to_binary(CONFIG_OPENTHREAD_NETWORK_MASTERKEY, dataset.mNetworkKey.m8,

@@ -807,6 +807,7 @@ void l2cble_process_sig_cmd (tL2C_LCB *p_lcb, UINT8 *p, UINT16 pkt_len)
         STREAM_TO_UINT16(mps, p);
         STREAM_TO_UINT16(credits, p);
         L2CAP_TRACE_DEBUG("%s spsm %x, scid %x", __func__, spsm, scid);
+        UNUSED(spsm);
 
         p_ccb = l2cu_find_ccb_by_remote_cid(p_lcb, scid);
         if (p_ccb) {
@@ -1429,7 +1430,7 @@ UINT32 CalConnectParamTimeout(tL2C_LCB *p_lcb)
     UINT32 timeout = 6;
     if (p_lcb != NULL){
         //1.25 * conn_int *(1+ latency) *32
-        timeout = (40 * ( 1 + p_lcb->current_used_conn_latency) * p_lcb->current_used_conn_interval + 1000) / 1000;
+        timeout = (40 * ( 1 + p_lcb->current_used_conn_latency) * p_lcb->current_used_conn_interval + 1.25 * p_lcb->waiting_update_conn_max_interval + 1000) / 1000;
         if (timeout < 1){
             timeout = 1;
         }else if (timeout > 120){

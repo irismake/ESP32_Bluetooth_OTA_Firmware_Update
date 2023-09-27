@@ -8,9 +8,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_attr.h"
+#include "hal/assert.h"
 #include "soc/periph_defs.h"
 #include "soc/pcr_reg.h"
 #include "soc/soc.h"
+#include "soc/soc_caps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,6 +92,8 @@ static inline uint32_t periph_ll_get_clk_en_mask(periph_module_t periph)
         //     return PCR_BT_BASEBAND_EN;
         // case PERIPH_BT_LC_MODULE:
         //     return PCR_BT_LC_EN;
+        case PERIPH_ASSIST_DEBUG_MODULE:
+            return PCR_ASSIST_CLK_EN;
         default:
             return 0;
     }
@@ -189,12 +194,14 @@ static inline uint32_t periph_ll_get_rst_en_mask(periph_module_t periph, bool en
         //     return PCR_BT_BASEBAND_EN;
         // case PERIPH_BT_LC_MODULE:
         //     return PCR_BT_LC_EN;
+        case PERIPH_ASSIST_DEBUG_MODULE:
+            return PCR_ASSIST_RST_EN;
         default:
             return 0;
     }
 }
 
-static uint32_t periph_ll_get_clk_en_reg(periph_module_t periph)
+static inline uint32_t periph_ll_get_clk_en_reg(periph_module_t periph)
 {// ESP32H2-TODO: IDF-6400
     switch (periph) {
     // case PERIPH_RNG_MODULE:
@@ -263,12 +270,14 @@ static uint32_t periph_ll_get_clk_en_reg(periph_module_t periph)
             return PCR_TSENS_CLK_CONF_REG;
         case PERIPH_REGDMA_MODULE:
             return PCR_REGDMA_CONF_REG;
+        case PERIPH_ASSIST_DEBUG_MODULE:
+            return PCR_ASSIST_CONF_REG;
     default:
         return 0;
     }
 }
 
-static uint32_t periph_ll_get_rst_en_reg(periph_module_t periph)
+static inline uint32_t periph_ll_get_rst_en_reg(periph_module_t periph)
 {
     // ESP32H2-TODO: IDF-6400
     switch (periph) {
@@ -330,6 +339,8 @@ static uint32_t periph_ll_get_rst_en_reg(periph_module_t periph)
             return PCR_TSENS_CLK_CONF_REG;
         case PERIPH_REGDMA_MODULE:
             return PCR_REGDMA_CONF_REG;
+        case PERIPH_ASSIST_DEBUG_MODULE:
+            return PCR_ASSIST_CONF_REG;
     default:
         return 0;
     }
@@ -382,6 +393,20 @@ static inline void periph_ll_wifi_module_disable_clk_set_rst(void)
     // DPORT_CLEAR_PERI_REG_MASK(SYSTEM_WIFI_CLK_EN_REG, SYSTEM_WIFI_CLK_WIFI_EN_M);// ESP32H2-TODO: IDF-6400
     // DPORT_SET_PERI_REG_MASK(SYSTEM_CORE_RST_EN_REG, 0);
 }
+
+FORCE_INLINE_ATTR bool periph_ll_uart_enabled(uint32_t uart_num)
+{
+    HAL_ASSERT(uart_num < SOC_UART_HP_NUM);
+    uint32_t uart_clk_config_reg = ((uart_num == 0) ? PCR_UART0_CONF_REG :
+                                    (uart_num == 1) ? PCR_UART1_CONF_REG : 0);
+    uint32_t uart_rst_bit = ((uart_num == 0) ? PCR_UART0_RST_EN :
+                            (uart_num == 1) ? PCR_UART1_RST_EN : 0);
+    uint32_t uart_en_bit  = ((uart_num == 0) ? PCR_UART0_CLK_EN :
+                            (uart_num == 1) ? PCR_UART1_CLK_EN : 0);
+    return REG_GET_BIT(uart_clk_config_reg, uart_rst_bit) == 0 &&
+        REG_GET_BIT(uart_clk_config_reg, uart_en_bit) != 0;
+}
+
 #ifdef __cplusplus
 }
 #endif

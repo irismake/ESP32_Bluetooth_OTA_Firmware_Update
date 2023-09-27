@@ -6,7 +6,7 @@ ESP-IDF 是乐鑫官方推出的物联网开发框架，支持 Windows、Linux �
 
 # ESP-IDF 版本支持期限
 
-![支持期限](https://dl.espressif.com/dl/esp-idf/support-periods.svg)
+![支持期限](https://dl.espressif.com/dl/esp-idf/support-periods.svg?v=1)
 
 - 请参考 [ESP-IDF 支持政策](SUPPORT_POLICY_CN.md) 以及 [相关文档](https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/versions.html) 了解更多关于 ESP-IDF 版本的信息。
 - 请参考 [ESP-IDF 版本停止维护 (EOL) 公告](https://www.espressif.com/zh-hans/support/documents/advisories?keys=&field_type_of_advisory_tid%5B%5D=817)。
@@ -27,6 +27,8 @@ ESP-IDF 是乐鑫官方推出的物联网开发框架，支持 Windows、Linux �
 
 [supported]: https://img.shields.io/badge/-%E6%94%AF%E6%8C%81-green "supported"
 [preview]: https://img.shields.io/badge/-%E9%A2%84%E8%A7%88-orange "preview"
+
+每款乐鑫芯片都可能有不同版本。建议参考 [ESP-IDF 版本与乐鑫芯片版本兼容性](https://github.com/espressif/esp-idf/blob/master/COMPATIBILITY_CN.md)，了解 ESP-IDF 版本与各芯片版本之间的兼容性。
 
 对于 2016 年之前发布的乐鑫芯片（包括 ESP8266 和 ESP8285），请参考 [RTOS SDK](https://github.com/espressif/ESP8266_RTOS_SDK)。
 

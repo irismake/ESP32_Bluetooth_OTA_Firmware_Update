@@ -63,6 +63,10 @@ config SOC_TWAI_SUPPORTED
     bool
     default y
 
+config SOC_EFUSE_SUPPORTED
+    bool
+    default y
+
 config SOC_EMAC_SUPPORTED
     bool
     default y
@@ -147,6 +151,10 @@ config SOC_ULP_FSM_SUPPORTED
     bool
     default y
 
+config SOC_CLK_TREE_SUPPORTED
+    bool
+    default y
+
 config SOC_DPORT_WORKAROUND_DIS_INTERRUPT_LVL
     int
     default 5
@@ -211,6 +219,10 @@ config SOC_ADC_DIGI_DATA_BYTES_PER_CONV
     int
     default 4
 
+config SOC_ADC_DIGI_MONITOR_NUM
+    int
+    default 0
+
 config SOC_ADC_SAMPLE_FREQ_THRES_HIGH
     int
     default 2
@@ -226,6 +238,10 @@ config SOC_ADC_RTC_MIN_BITWIDTH
 config SOC_ADC_RTC_MAX_BITWIDTH
     int
     default 12
+
+config SOC_ADC_SHARED_POWER
+    bool
+    default y
 
 config SOC_SHARED_IDCACHE_SUPPORTED
     bool
@@ -304,6 +320,10 @@ config SOC_I2C_SUPPORT_SLAVE
     default y
 
 config SOC_I2C_SUPPORT_APB
+    bool
+    default y
+
+config SOC_I2C_STOP_INDEPENDENT
     bool
     default y
 
@@ -651,6 +671,10 @@ config SOC_UART_NUM
     int
     default 3
 
+config SOC_UART_HP_NUM
+    int
+    default 3
+
 config SOC_UART_SUPPORT_APB_CLK
     bool
     default y
@@ -679,6 +703,10 @@ config SOC_SHA_SUPPORT_PARALLEL_ENG
     bool
     default y
 
+config SOC_SHA_ENDIANNESS_BE
+    bool
+    default y
+
 config SOC_SHA_SUPPORT_SHA1
     bool
     default y
@@ -692,6 +720,14 @@ config SOC_SHA_SUPPORT_SHA384
     default y
 
 config SOC_SHA_SUPPORT_SHA512
+    bool
+    default y
+
+config SOC_MPI_MEM_BLOCKS_NUM
+    int
+    default 4
+
+config SOC_MPI_OPERATIONS_NUM
     bool
     default y
 

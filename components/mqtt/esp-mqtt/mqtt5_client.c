@@ -16,23 +16,26 @@ static char *esp_mqtt5_client_get_topic_alias(mqtt5_topic_alias_handle_t topic_a
 static void esp_mqtt5_client_delete_topic_alias(mqtt5_topic_alias_handle_t topic_alias_handle);
 static esp_err_t esp_mqtt5_user_property_copy(mqtt5_user_property_handle_t user_property_new, const mqtt5_user_property_handle_t user_property_old);
 
-void esp_mqtt5_flow_control(esp_mqtt5_client_handle_t client)
+void esp_mqtt5_increment_packet_counter(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
-        int msg_type = mqtt5_get_type(client->mqtt_state.outbound_message->data);
-        if (msg_type == MQTT_MSG_TYPE_PUBLISH) {
-            int msg_qos = mqtt5_get_qos(client->mqtt_state.outbound_message->data);
-            if (msg_qos > 0) {
-                client->send_publish_packet_count ++;
-                ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
-            }
-        }
+    bool msg_dup = mqtt5_get_dup(client->mqtt_state.connection.outbound_message.data);
+    if (msg_dup == false) {
+        client->send_publish_packet_count ++;
+        ESP_LOGD(TAG, "Sent (%d) qos > 0 publish packet without ack", client->send_publish_packet_count);
+    }
+}
+
+void esp_mqtt5_decrement_packet_counter(esp_mqtt5_client_handle_t client)
+{
+    if (client->send_publish_packet_count > 0) {
+        client->send_publish_packet_count --;
+        ESP_LOGD(TAG, "Receive (%d) qos > 0 publish packet with ack", client->send_publish_packet_count);
     }
 }
 
 void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBCOMP return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len));
         size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
         client->event.data = mqtt5_get_pubcomp_data(client->mqtt_state.in_buffer, &msg_data_len, &client->event.property->user_property);
@@ -44,20 +47,19 @@ void esp_mqtt5_parse_pubcomp(esp_mqtt5_client_handle_t client)
 
 void esp_mqtt5_parse_puback(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         ESP_LOGI(TAG, "MQTT_MSG_TYPE_PUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len));
         size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
         client->event.data = mqtt5_get_puback_data(client->mqtt_state.in_buffer, &msg_data_len, &client->event.property->user_property);
         client->event.data_len = msg_data_len;
         client->event.total_data_len = msg_data_len;
         client->event.current_data_offset = 0;
-        client->send_publish_packet_count --;
     }
 }
 
 void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         ESP_LOGI(TAG, "MQTT_MSG_TYPE_UNSUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len));
         size_t msg_data_len = client->mqtt_state.in_buffer_read_len;
         client->event.data = mqtt5_get_unsuback_data(client->mqtt_state.in_buffer, &msg_data_len, &client->event.property->user_property);
@@ -69,7 +71,7 @@ void esp_mqtt5_parse_unsuback(esp_mqtt5_client_handle_t client)
 
 void esp_mqtt5_parse_suback(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         ESP_LOGI(TAG, "MQTT_MSG_TYPE_SUBACK return code is %d", mqtt5_msg_get_reason_code(client->mqtt_state.in_buffer, client->mqtt_state.in_buffer_read_len));
     }
 }
@@ -79,13 +81,14 @@ esp_err_t esp_mqtt5_parse_connack(esp_mqtt5_client_handle_t client, int *connect
     size_t len = client->mqtt_state.in_buffer_read_len;
     client->mqtt_state.in_buffer_read_len = 0;
     uint8_t ack_flag = 0;
-    if (mqtt5_msg_parse_connack_property(client->mqtt_state.in_buffer, len, &client->connect_info, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->server_resp_property_info, connect_rsp_code, &ack_flag, &client->event.property->user_property) != ESP_OK) {
+    if (mqtt5_msg_parse_connack_property(client->mqtt_state.in_buffer, len, &client->mqtt_state.
+                                         connection.information, &client->mqtt5_config->connect_property_info, &client->mqtt5_config->server_resp_property_info, connect_rsp_code, &ack_flag, &client->event.property->user_property) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to parse CONNACK packet");
         return ESP_FAIL;
     }
     if (*connect_rsp_code == MQTT_CONNECTION_ACCEPTED) {
         ESP_LOGD(TAG, "Connected");
-        client->event.session_present = ack_flag & 0x01; 
+        client->event.session_present = ack_flag & 0x01;
         return ESP_OK;
     }
     esp_mqtt5_print_error_code(client, *connect_rsp_code);
@@ -98,7 +101,7 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
     uint16_t property_len = 0;
     esp_mqtt5_publish_resp_property_t property = {0};
     *msg_data = mqtt5_get_publish_property_payload(msg_buf, msg_read_len, msg_topic, msg_topic_len, &property, &property_len, msg_data_len, &client->event.property->user_property);
-     if (*msg_data_len == 0 || *msg_data == NULL) {
+     if (*msg_data == NULL) {
         ESP_LOGE(TAG, "%s: mqtt5_get_publish_property_payload() failed", __func__);
         return ESP_FAIL;
     }
@@ -114,7 +117,7 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
             *msg_topic = esp_mqtt5_client_get_topic_alias(client->mqtt5_config->peer_topic_alias, property.topic_alias, msg_topic_len);
             if (!*msg_topic) {
                 ESP_LOGE(TAG, "%s: esp_mqtt5_client_get_topic_alias() failed", __func__);
-                return ESP_FAIL; 
+                return ESP_FAIL;
             }
         } else {
             if (esp_mqtt5_client_update_topic_alias(client->mqtt5_config->peer_topic_alias, property.topic_alias, *msg_topic, *msg_topic_len) != ESP_OK) {
@@ -131,12 +134,13 @@ esp_err_t esp_mqtt5_get_publish_data(esp_mqtt5_client_handle_t client, uint8_t *
     client->event.property->correlation_data_len = property.correlation_data_len;
     client->event.property->content_type = property.content_type;
     client->event.property->content_type_len = property.content_type_len;
+    client->event.property->subscribe_id = property.subscribe_id;
     return ESP_OK;
 }
 
 esp_err_t esp_mqtt5_create_default_config(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         client->event.property = calloc(1, sizeof(esp_mqtt5_event_property_t));
         ESP_MEM_CHECK(TAG, client->event.property, return ESP_FAIL)
         client->mqtt5_config = calloc(1, sizeof(mqtt5_config_storage_t));
@@ -169,7 +173,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_UNSUPPORTED_PROTOCOL_VER:
         ESP_LOGW(TAG, "Unsupported Protocol Version");
         break;
-    case MQTT5_INVAILD_CLIENT_ID:
+    case MQTT5_INVALID_CLIENT_ID:
         ESP_LOGW(TAG, "Client Identifier not valid");
         break;
     case MQTT5_BAD_USERNAME_OR_PWD:
@@ -199,10 +203,10 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_SESSION_TAKEN_OVER:
         ESP_LOGW(TAG, "Session taken over");
         break;
-    case MQTT5_TOPIC_FILTER_INVAILD:
+    case MQTT5_TOPIC_FILTER_INVALID:
         ESP_LOGW(TAG, "Topic Filter invalid");
         break;
-    case MQTT5_TOPIC_NAME_INVAILD:
+    case MQTT5_TOPIC_NAME_INVALID:
         ESP_LOGW(TAG, "Topic Name invalid");
         break;
     case MQTT5_PACKET_IDENTIFIER_IN_USE:
@@ -214,7 +218,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_RECEIVE_MAXIMUM_EXCEEDED:
         ESP_LOGW(TAG, "Receive Maximum exceeded");
         break;
-    case MQTT5_TOPIC_ALIAS_INVAILD:
+    case MQTT5_TOPIC_ALIAS_INVALID:
         ESP_LOGW(TAG, "Topic Alias invalid");
         break;
     case MQTT5_PACKET_TOO_LARGE:
@@ -229,7 +233,7 @@ static void esp_mqtt5_print_error_code(esp_mqtt5_client_handle_t client, int cod
     case MQTT5_ADMINISTRATIVE_ACTION:
         ESP_LOGW(TAG, "Administrative action");
         break;
-    case MQTT5_PAYLOAD_FORMAT_INVAILD:
+    case MQTT5_PAYLOAD_FORMAT_INVALID:
         ESP_LOGW(TAG, "Payload format invalid");
         break;
     case MQTT5_RETAIN_NOT_SUPPORT:
@@ -291,7 +295,7 @@ esp_err_t esp_mqtt5_client_publish_check(esp_mqtt5_client_handle_t client, int q
     }
 
     /* Flow control to check PUBLISH(No PUBACK or PUBCOMP received) packet sent count(Only record QoS1 and QoS2)*/
-    if (client->send_publish_packet_count >= client->mqtt5_config->server_resp_property_info.receive_maximum) {
+    if (client->send_publish_packet_count > client->mqtt5_config->server_resp_property_info.receive_maximum) {
         ESP_LOGE(TAG, "Client send more than %d QoS1 and QoS2 PUBLISH packet without no ack", client->mqtt5_config->server_resp_property_info.receive_maximum);
         return ESP_FAIL;
     }
@@ -301,7 +305,7 @@ esp_err_t esp_mqtt5_client_publish_check(esp_mqtt5_client_handle_t client, int q
 
 void esp_mqtt5_client_destory(esp_mqtt5_client_handle_t client)
 {
-    if (client->connect_info.protocol_ver == MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver == MQTT_PROTOCOL_V_5) {
         if (client->mqtt5_config) {
             free(client->mqtt5_config->will_property_info.content_type);
             free(client->mqtt5_config->will_property_info.response_topic);
@@ -413,7 +417,7 @@ esp_err_t esp_mqtt5_client_set_publish_property(esp_mqtt5_client_handle_t client
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
-    if(client->connect_info.protocol_ver != MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
         ESP_LOGE(TAG, "MQTT protocol version is not v5");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -442,7 +446,7 @@ esp_err_t esp_mqtt5_client_set_subscribe_property(esp_mqtt5_client_handle_t clie
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
-    if (client->connect_info.protocol_ver != MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
         ESP_LOGE(TAG, "MQTT protocol version is not v5");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -479,7 +483,7 @@ esp_err_t esp_mqtt5_client_set_unsubscribe_property(esp_mqtt5_client_handle_t cl
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
-    if (client->connect_info.protocol_ver != MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
         ESP_LOGE(TAG, "MQTT protocol version is not v5");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -510,7 +514,7 @@ esp_err_t esp_mqtt5_client_set_disconnect_property(esp_mqtt5_client_handle_t cli
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
-    if (client->connect_info.protocol_ver != MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
         ESP_LOGE(TAG, "MQTT protocol version is not v5");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -553,7 +557,7 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
     MQTT_API_LOCK(client);
 
     /* Check protocol version */
-    if (client->connect_info.protocol_ver != MQTT_PROTOCOL_V_5) {
+    if (client->mqtt_state.connection.information.protocol_ver != MQTT_PROTOCOL_V_5) {
         ESP_LOGE(TAG, "MQTT protocol version is not v5");
         MQTT_API_UNLOCK(client);
         return ESP_FAIL;
@@ -569,7 +573,7 @@ esp_err_t esp_mqtt5_client_set_connect_property(esp_mqtt5_client_handle_t client
                 return ESP_FAIL;
             } else {
                 client->mqtt5_config->connect_property_info.maximum_packet_size = connect_property->maximum_packet_size;
-            }  
+            }
         } else {
             client->mqtt5_config->connect_property_info.maximum_packet_size = client->mqtt_state.in_buffer_length;
         }

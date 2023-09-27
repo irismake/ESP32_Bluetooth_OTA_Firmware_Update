@@ -810,6 +810,23 @@ typedef struct {
     UINT8       hci_status;
 } tBTM_SET_AFH_CHANNELS_RESULTS;
 
+/* Structure returned with set page timeout event (in tBTM_CMPL_CB callback function)
+** in response to BTM_WritePageTimeout call.
+*/
+typedef struct {
+    tBTM_STATUS status;
+    UINT8       hci_status;
+} tBTM_SET_PAGE_TIMEOUT_RESULTS;
+
+/* Structure returned with get page timeout event (in tBTM_CMPL_CB callback function)
+** in response to BTM_ReadPageTimeout call.
+*/
+typedef struct {
+    tBTM_STATUS status;
+    UINT8       hci_status;
+    UINT16      page_to;
+} tBTM_GET_PAGE_TIMEOUT_RESULTS;
+
 /* Structure returned with set BLE channels event (in tBTM_CMPL_CB callback function)
 ** in response to BTM_BleSetChannels call.
 */
@@ -1061,6 +1078,17 @@ enum {
     BTM_SCO_DATA_PAR_LOST
 };
 typedef UINT8 tBTM_SCO_DATA_FLAG;
+
+/* Count the number of SCO Data Packet Status */
+typedef struct {
+    UINT32 rx_total;
+    UINT32 rx_correct;
+    UINT32 rx_err;
+    UINT32 rx_none;
+    UINT32 rx_lost;
+    UINT32 tx_total;
+    UINT32 tx_discarded;
+} tBTM_SCO_PKT_STAT_NUMS;
 
 /***************************
 **  SCO Callback Functions
@@ -2192,7 +2220,21 @@ UINT8 BTM_SetTraceLevel (UINT8 new_level);
 **
 *******************************************************************************/
 //extern
-tBTM_STATUS BTM_WritePageTimeout(UINT16 timeout);
+tBTM_STATUS BTM_WritePageTimeout(UINT16 timeout, tBTM_CMPL_CB *p_cb);
+
+/*******************************************************************************
+**
+** Function         BTM_ReadPageTimeout
+**
+** Description      Send HCI Read Page Timeout.
+**
+** Returns
+**      BTM_SUCCESS         Command sent.
+**      BTM_NO_RESOURCES    If out of resources to send the command.
+**
+*******************************************************************************/
+//extern
+tBTM_STATUS BTM_ReadPageTimeout(tBTM_CMPL_CB *p_cb);
 
 /*******************************************************************************
 **
@@ -4189,6 +4231,17 @@ tBTM_STATUS BTM_SetAfhChannels (AFH_CHANNELS channels, tBTM_CMPL_CB *p_afh_chann
 **
 *******************************************************************************/
 tBTM_STATUS BTM_BleSetChannels (BLE_CHANNELS channels, tBTM_CMPL_CB *p_ble_channels_cmpl_cback);
+
+/*******************************************************************************
+**
+** Function         BTM_PktStatNumsGet
+**
+** Description      This function is called to get the number of packet status struct
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTM_PktStatNumsGet(UINT16 sync_conn_handle, tBTM_SCO_PKT_STAT_NUMS *pkt_nums);
 
 #ifdef __cplusplus
 }

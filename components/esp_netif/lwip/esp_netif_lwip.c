@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: 2019-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2019-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <string.h>
+#include <inttypes.h>
 #include <lwip/ip_addr.h>
 #include <lwip/sockets.h>
 
@@ -241,7 +242,7 @@ static void esp_netif_api_cb(void *api_msg)
 static inline esp_err_t esp_netif_lwip_ipc_call_msg(esp_netif_api_msg_t *msg)
 {
     if (!sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER)) {
-        ESP_LOGD(TAG, "check: remote, if=%p fn=%p\n", msg->esp_netif, msg->api_fn);
+        ESP_LOGD(TAG, "check: remote, if=%p fn=%p", msg->esp_netif, msg->api_fn);
 #if LWIP_TCPIP_CORE_LOCKING
         tcpip_send_msg_wait_sem((tcpip_callback_fn)esp_netif_api_cb, msg, NULL);
 #else
@@ -251,7 +252,7 @@ static inline esp_err_t esp_netif_lwip_ipc_call_msg(esp_netif_api_msg_t *msg)
 #endif /* LWIP_TCPIP_CORE_LOCKING */
         return msg->ret;
     }
-    ESP_LOGD(TAG, "check: local, if=%p fn=%p\n",  msg->esp_netif, msg->api_fn);
+    ESP_LOGD(TAG, "check: local, if=%p fn=%p",  msg->esp_netif, msg->api_fn);
     return msg->api_fn(msg);
 }
 
@@ -721,7 +722,7 @@ esp_netif_t *esp_netif_new(const esp_netif_config_t *esp_netif_config)
     // Create parent esp-netif object
     esp_netif_t *esp_netif = calloc(1, sizeof(struct esp_netif_obj));
     if (!esp_netif) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes (free heap size %d)", sizeof(struct esp_netif_obj),
+        ESP_LOGE(TAG, "Failed to allocate %" PRIu32 " bytes (free heap size %" PRIu32 ")", (uint32_t)sizeof(struct esp_netif_obj),
                  esp_get_free_heap_size());
         return NULL;
     }
@@ -729,7 +730,7 @@ esp_netif_t *esp_netif_new(const esp_netif_config_t *esp_netif_config)
     // Create ip info
     esp_netif_ip_info_t *ip_info = calloc(1, sizeof(esp_netif_ip_info_t));
     if (!ip_info) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes (free heap size %d)", sizeof(esp_netif_ip_info_t),
+        ESP_LOGE(TAG, "Failed to allocate %" PRIu32 " bytes (free heap size %" PRIu32 ")", (uint32_t)sizeof(esp_netif_ip_info_t),
                  esp_get_free_heap_size());
         free(esp_netif);
         return NULL;
@@ -739,7 +740,7 @@ esp_netif_t *esp_netif_new(const esp_netif_config_t *esp_netif_config)
     // creating another ip info (to store old ip)
     ip_info = calloc(1, sizeof(esp_netif_ip_info_t));
     if (!ip_info) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes (free heap size %d)", sizeof(esp_netif_ip_info_t),
+        ESP_LOGE(TAG, "Failed to allocate %" PRIu32 " bytes (free heap size %" PRIu32 ")", (uint32_t)sizeof(esp_netif_ip_info_t),
                  esp_get_free_heap_size());
         free(esp_netif->ip_info);
         free(esp_netif);
@@ -758,7 +759,7 @@ esp_netif_t *esp_netif_new(const esp_netif_config_t *esp_netif_config)
 
     struct netif * lwip_netif = calloc(1, sizeof(struct netif));
     if (!lwip_netif) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes (free heap size %d)", sizeof(struct netif),
+        ESP_LOGE(TAG, "Failed to allocate %" PRIu32 " bytes (free heap size %" PRIu32 ")", (uint32_t)sizeof(struct netif),
                  esp_get_free_heap_size());
         free(esp_netif->ip_info_old);
         free(esp_netif->ip_info);
@@ -836,7 +837,7 @@ static esp_err_t esp_netif_lwip_add(esp_netif_t *esp_netif)
 #if CONFIG_PPP_SUPPORT
         err_t err = esp_netif->lwip_init_fn(NULL);
         if (err != ERR_OK) {
-            ESP_LOGE(TAG, "Init netif failed with  %d", err);
+            ESP_LOGE(TAG, "Init netif failed with  %" PRId8 "", err);
             return ESP_ERR_ESP_NETIF_INIT_FAILED;
         }
 #else
@@ -1342,8 +1343,8 @@ static esp_err_t esp_netif_start_ip_lost_timer(esp_netif_t *esp_netif)
         return ESP_OK;
     }
 
-    ESP_LOGD(TAG, "if%p start ip lost tmr: no need start because netif=%p interval=%d ip=%x",
-             esp_netif, netif, CONFIG_ESP_NETIF_IP_LOST_TIMER_INTERVAL, ip_info_old->ip.addr);
+    ESP_LOGD(TAG, "if%p start ip lost tmr: no need start because netif=%p interval=%d ip=%" PRIx32,
+             esp_netif, netif, (CONFIG_ESP_NETIF_IP_LOST_TIMER_INTERVAL), ip_info_old->ip.addr);
 
     return ESP_OK;
 }
@@ -1863,7 +1864,7 @@ static esp_err_t esp_netif_set_dns_info_api(esp_netif_api_msg_t *msg)
     esp_netif_dns_type_t type = dns_param->dns_type;
     esp_netif_dns_info_t *dns = dns_param->dns_info;
 
-    ESP_LOGD(TAG, "esp_netif_set_dns_info: if=%p type=%d dns=%x", esp_netif, type, dns->ip.u_addr.ip4.addr);
+    ESP_LOGD(TAG, "esp_netif_set_dns_info: if=%p type=%d dns=%" PRIx32, esp_netif, type, dns->ip.u_addr.ip4.addr);
 
     ip_addr_t lwip_ip = {};
     ESPIP_TO_IP(&dns->ip, &lwip_ip);
@@ -2228,34 +2229,43 @@ esp_err_t esp_netif_dhcps_option_api(esp_netif_api_msg_t *msg)
             }
             case REQUESTED_IP_ADDRESS: {
                 esp_netif_ip_info_t info;
-                uint32_t softap_ip = 0;
+                uint32_t server_ip = 0;
                 uint32_t start_ip = 0;
                 uint32_t end_ip = 0;
+                uint32_t range_start_ip = 0;
+                uint32_t range_end_ip = 0;
                 dhcps_lease_t *poll = opt->val;
 
                 if (poll->enable) {
                     memset(&info, 0x00, sizeof(esp_netif_ip_info_t));
                     esp_netif_get_ip_info(esp_netif, &info);
 
-                    softap_ip = htonl(info.ip.addr);
+                    server_ip = htonl(info.ip.addr);
+                    range_start_ip = server_ip & htonl(info.netmask.addr);
+                    range_end_ip = range_start_ip | ~htonl(info.netmask.addr);
+                    if (server_ip == range_start_ip || server_ip == range_end_ip) {
+                        return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
+                    }
                     start_ip = htonl(poll->start_ip.addr);
                     end_ip = htonl(poll->end_ip.addr);
 
                     /*config ip information can't contain local ip*/
-                    if ((start_ip <= softap_ip) && (softap_ip <= end_ip)) {
+                    if ((server_ip >= start_ip) && (server_ip <= end_ip)) {
                         return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
                     }
-
                     /*config ip information must be in the same segment as the local ip*/
-                    softap_ip >>= 8;
-                    if ((start_ip >> 8 != softap_ip)
-                        || (end_ip >> 8 != softap_ip)) {
+                    if (start_ip <= range_start_ip || start_ip >= range_end_ip) {
                         return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
                     }
-
-                    if (end_ip - start_ip > DHCPS_MAX_LEASE) {
+                    if (end_ip <= range_start_ip || end_ip >= range_end_ip) {
                         return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
                     }
+                    /*The number of configured ip is less than DHCPS_MAX_LEASE*/
+                    if ((end_ip - start_ip + 1 > DHCPS_MAX_LEASE) || (start_ip >= end_ip)) {
+                        return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
+                    }
+                } else {
+                    return ESP_ERR_ESP_NETIF_INVALID_PARAMS;
                 }
 
                 memcpy(opt_info, opt->val, opt->len);

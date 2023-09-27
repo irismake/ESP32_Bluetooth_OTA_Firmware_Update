@@ -35,10 +35,11 @@
     - run_cmd pytest $TEST_DIR
       -m \"${markers}\"
       --junitxml=XUNIT_RESULT.xml
-      --known-failure-cases-file known_failure_cases/known_failure_cases.txt
+      --ignore-result-files known_failure_cases/known_failure_cases.txt
       --parallel-count ${CI_NODE_TOTAL:-1}
       --parallel-index ${CI_NODE_INDEX:-1}
       ${PYTEST_EXTRA_FLAGS}
+      --app-info-filepattern \"list_job_*.txt\"
 
 .pytest_examples_dir_template:
   extends: .pytest_template
@@ -100,7 +101,7 @@ pytest_examples_esp32_jtag:
 pytest_examples_esp32_ccs811:
   extends:
     - .pytest_examples_dir_template
-    - .rules:test:example_test-esp32-ccs811
+    - .rules:test:example_test-esp32
   needs:
     - build_pytest_examples_esp32
   tags: [ esp32, ccs811 ]
@@ -305,6 +306,38 @@ pytest_examples_esp32s3_wifi_ap:
     - build_pytest_examples_esp32s3
   tags: [ esp32s3, wifi_ap ]
 
+pytest_examples_esp32s2_wifi_ap:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32s2-wifi
+  needs:
+    - build_pytest_examples_esp32s2
+  tags: [ esp32s2, wifi_ap ]
+
+pytest_examples_esp32c2_wifi_ap:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c2-wifi
+  needs:
+    - build_pytest_examples_esp32c2
+  tags: [ esp32c2, wifi_ap, xtal_40mhz ]
+
+pytest_examples_esp32c2_26m_wifi_ap:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c2-wifi
+  needs:
+    - build_pytest_examples_esp32c2
+  tags: [ esp32c2, wifi_ap, xtal_26mhz ]
+
+pytest_examples_esp32c6_wifi_ap:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c6-wifi
+  needs:
+    - build_pytest_examples_esp32c6
+  tags: [ esp32c6, wifi_ap ]
+
 pytest_examples_esp32_wifi_router:
   extends:
     - .pytest_examples_dir_template
@@ -328,6 +361,40 @@ pytest_examples_esp32s3_wifi_router:
   needs:
     - build_pytest_examples_esp32s3
   tags: [ esp32s3, wifi_router ]
+
+pytest_examples_esp32s2_wifi_router:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32s2-wifi
+  needs:
+    - build_pytest_examples_esp32s2
+  tags: [ esp32s2, wifi_router ]
+
+pytest_examples_esp32c2_wifi_router:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c2-wifi
+  needs:
+    - build_pytest_examples_esp32c2
+  tags: [ esp32c2, wifi_router, xtal_40mhz ]
+
+pytest_examples_esp32c2_26m_wifi_router:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c2-wifi
+  needs:
+    - build_pytest_examples_esp32c2
+  tags: [ esp32c2, wifi_router, xtal_26mhz ]
+
+pytest_examples_esp32c6_wifi_router:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c6-wifi
+  needs:
+    - build_pytest_examples_esp32c6
+  tags: [ esp32c6, wifi_router ]
+
+
 pytest_examples_esp32_wifi_iperf:
   extends:
     - .pytest_examples_dir_template
@@ -352,6 +419,14 @@ pytest_examples_esp32_ethernet_router:
     - build_pytest_examples_esp32
   tags: [ esp32, ethernet_router ]
 
+pytest_examples_esp32_ethernet_vlan:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32-ethernet
+  needs:
+    - build_pytest_examples_esp32
+  tags: [ esp32, ethernet_vlan ]
+
 pytest_examples_esp32_ethernet_ip101:
   extends:
     - .pytest_examples_dir_template
@@ -359,6 +434,16 @@ pytest_examples_esp32_ethernet_ip101:
   needs:
     - build_pytest_examples_esp32
   tags: [ esp32, ip101 ]
+
+example_test_pytest_esp32_ethernet_bridge:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32
+  needs:
+    - build_pytest_examples_esp32
+  tags: [ esp32, eth_w5500 ]
+  variables:
+    PYTEST_EXTRA_FLAGS: "--dev-passwd ${ETHERNET_TEST_PASSWORD} --dev-user ${ETHERNET_TEST_USER}"
 
 pytest_examples_esp32_flash_encryption:
   extends:
@@ -407,6 +492,14 @@ pytest_examples_esp32c3_flash_encryption:
   needs:
     - build_pytest_examples_esp32c3
   tags: [ esp32c3, flash_encryption ]
+
+pytest_examples_esp32c3_nvs_encr_hmac:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32c3-nvs_encr_hmac
+  needs:
+    - build_pytest_examples_esp32c3
+  tags: [ esp32c3, nvs_encr_hmac ]
 
 pytest_examples_esp32s2_usb_device:
   extends:
@@ -545,7 +638,7 @@ pytest_components_esp32_generic_multi_device:
 pytest_components_esp32_wifi_two_dut:
   extends:
     - .pytest_components_dir_template
-    - .rules:test:component_ut-esp32-wifi
+    - .rules:test:component_ut-esp32
   needs:
     - build_pytest_components_esp32
   tags: [ esp32, wifi_two_dut ]
@@ -704,6 +797,14 @@ pytest_components_esp32s3_octal_psram:
     - build_pytest_components_esp32s3
   tags: [ esp32s3, octal_psram ]
 
+pytest_components_esp32s3_quad_psram:
+  extends:
+    - .pytest_components_dir_template
+    - .rules:test:component_ut-esp32s3
+  needs:
+    - build_pytest_components_esp32s3
+  tags: [ esp32s3, quad_psram ]
+
 pytest_components_esp32s3_flash_encryption_f4r8:
   extends:
     - .pytest_components_dir_template
@@ -794,6 +895,14 @@ pytest_components_esp32c3_generic:
   tags: [ esp32c3, generic ]
   parallel: 3
 
+pytest_components_esp32c3_i2c_oled:
+  extends:
+    - .pytest_components_dir_template
+    - .rules:test:component_ut-esp32c3
+  needs:
+    - build_pytest_components_esp32c3
+  tags: [ esp32c3, i2c_oled ]
+
 pytest_components_esp32c3_generic_multi_device:
   extends:
     - .pytest_components_dir_template
@@ -841,6 +950,14 @@ pytest_components_esp32c3_flash_encryption:
   needs:
     - build_pytest_components_esp32c3
   tags: [ esp32c3, flash_encryption ]
+
+pytest_components_esp32c3_nvs_encr_hmac:
+  extends:
+    - .pytest_components_dir_template
+    - .rules:test:component_ut-esp32c3-nvs_encr_hmac
+  needs:
+    - build_pytest_components_esp32c3
+  tags: [ esp32c3, nvs_encr_hmac ]
 
 pytest_components_esp32c3_flash_multi:
   extends:
@@ -960,6 +1077,37 @@ pytest_examples_openthread_br:
     - esp32c6
     - openthread_br
 
+pytest_examples_openthread_bbr:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-i154
+  needs:
+    - build_pytest_examples_esp32s3
+    - build_pytest_examples_esp32c6
+    - build_pytest_examples_esp32h2
+  tags:
+    - esp32c6
+    - openthread_bbr
+
+pytest_examples_openthread_sleep:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32h2
+  needs:
+    - build_pytest_examples_esp32c6
+    - build_pytest_examples_esp32h2
+  tags: [ esp32c6, openthread_sleep ]
+
+pytest_examples_zigbee:
+  extends:
+    - .pytest_examples_dir_template
+    - .rules:test:example_test-esp32h2
+  needs:
+    - build_pytest_examples_esp32h2
+  tags:
+    - esp32h2
+    - zigbee_multi_dut
+
 pytest_components_esp32s3_usb_host:
   extends:
     - .pytest_components_dir_template
@@ -993,6 +1141,14 @@ pytest_test_apps_esp32_jtag:
   variables:
     SETUP_TOOLS: "1"  # need gdb
     PYTEST_EXTRA_FLAGS: "--log-cli-level DEBUG"
+
+pytest_test_apps_esp32_ethernet:
+  extends:
+    - .pytest_test_apps_dir_template
+    - .rules:test:custom_test-esp32
+  needs:
+    - build_pytest_test_apps_esp32
+  tags: [ esp32, ethernet ]
 
 pytest_test_apps_esp32s2_generic:
   extends:
@@ -1068,6 +1224,38 @@ pytest_test_apps_esp32s3_mspi_f4r4:
     - build_pytest_test_apps_esp32s3
   tags: [ esp32s3, MSPI_F4R4 ]
 
+pytest_test_apps_esp32s2_wifi_two_dut:
+  extends:
+    - .pytest_test_apps_dir_template
+    - .rules:test:custom_test-esp32s2-wifi
+  needs:
+    - build_pytest_test_apps_esp32s2
+  tags: [ esp32s2, wifi_two_dut ]
+
+pytest_test_apps_esp32s3_wifi_two_dut:
+  extends:
+    - .pytest_test_apps_dir_template
+    - .rules:test:custom_test-esp32s3-wifi
+  needs:
+    - build_pytest_test_apps_esp32s3
+  tags: [ esp32s3, wifi_two_dut ]
+
+pytest_test_apps_esp32c2_wifi_two_dut:
+  extends:
+    - .pytest_test_apps_dir_template
+    - .rules:test:custom_test-esp32c2-wifi
+  needs:
+    - build_pytest_test_apps_esp32c2
+  tags: [ esp32c2, wifi_two_dut, xtal_26mhz ]
+
+pytest_test_apps_esp32c3_wifi_two_dut:
+  extends:
+    - .pytest_test_apps_dir_template
+    - .rules:test:custom_test-esp32c3-wifi
+  needs:
+    - build_pytest_test_apps_esp32c3
+  tags: [ esp32c3, wifi_two_dut]
+
 # for parallel jobs, CI_JOB_NAME will be "job_name index/total" (for example, "IT_001 1/2")
 # we need to convert to pattern "job_name_index.yml"
 .define_config_file_name: &define_config_file_name |
@@ -1105,44 +1293,6 @@ pytest_test_apps_esp32s3_mspi_f4r4:
     # run test
     - cd tools/ci/python_packages/tiny_test_fw/bin
     - run_cmd python Runner.py $TEST_CASE_PATH -c $CONFIG_FILE -e $ENV_FILE --known_failure_cases_file $CI_PROJECT_DIR/known_failure_cases/known_failure_cases.txt
-
-.example_test_template:
-  extends: .target_test_job_template
-  needs:
-    - assign_example_test
-  variables:
-    TEST_CASE_PATH: "$CI_PROJECT_DIR/examples"
-    CONFIG_FILE_PATH: "${CI_PROJECT_DIR}/examples/test_configs"
-
-.example_test_esp32_template:
-  extends:
-    - .example_test_template
-    - .rules:test:example_test-esp32
-
-.example_test_esp32c3_template:
-  extends:
-    - .example_test_template
-    - .rules:test:example_test-esp32c3
-
-example_test_001C:
-  extends: .example_test_esp32_template
-  tags:
-    - ESP32
-    - Example_GENERIC
-
-example_test_005:
-  extends:
-    - .example_test_esp32_template
-    - .rules:test:example_test-esp32-bt
-  tags:
-    - ESP32
-    - Example_WIFI_BT
-
-example_test_C3_GENERIC:
-  extends: .example_test_esp32c3_template
-  tags:
-    - ESP32C3
-    - Example_GENERIC
 
 .unit_test_template:
   extends: .target_test_job_template
@@ -1190,7 +1340,7 @@ example_test_C3_GENERIC:
 
 UT_001:
   extends: .unit_test_esp32_template
-  parallel: 16
+  parallel: 2
   tags:
     - ESP32_IDF
     - UT_T1_1
@@ -1199,7 +1349,6 @@ UT_001:
 
 UT_002:
   extends: .unit_test_esp32_template
-  parallel: 7
   tags:
     - ESP32_IDF
     - UT_T1_1
@@ -1244,31 +1393,12 @@ UT_028:
     - UT_T2_1
     - psram
 
-UT_033:
-  extends: .unit_test_esp32_template
-  tags:
-    - ESP32_IDF
-    - UT_T2_Ethernet
-    - psram
-
-UT_034:
-  extends: .unit_test_esp32_template
-  tags:
-    - ESP32_IDF
-    - UT_T1_ESP_FLASH
-
 UT_035:
   extends: .unit_test_esp32s2_template
-  parallel: 16
+  parallel: 2
   tags:
     - ESP32S2_IDF
     - UT_T1_1
-
-UT_038:
-  extends: .unit_test_esp32s2_template
-  tags:
-    - ESP32S2_IDF
-    - UT_T1_ESP_FLASH
 
 UT_S2_SDSPI:
   extends:
@@ -1280,34 +1410,17 @@ UT_S2_SDSPI:
 
 UT_C2:
   extends: .unit_test_esp32c2_template
-  parallel: 8
+  parallel: 2
   tags:
     - ESP32C2_IDF
     - UT_T1_1
-    - xtal_40mhz
-
-UT_C2_FLASH:
-  extends:
-    - .unit_test_esp32c2_template
-  tags:
-    - ESP32C2_IDF
-    - UT_T1_ESP_FLASH
     - xtal_40mhz
 
 UT_C3:
   extends: .unit_test_esp32c3_template
-  parallel: 11
   tags:
     - ESP32C3_IDF
     - UT_T1_1
-
-UT_C3_FLASH:
-  extends:
-    - .unit_test_esp32c3_template
-    - .rules:test:unit_test-esp32c3-flash_multi
-  tags:
-    - ESP32C3_IDF
-    - UT_T1_ESP_FLASH
 
 UT_C3_SDSPI:
   extends:
@@ -1319,39 +1432,23 @@ UT_C3_SDSPI:
 
 UT_C6:
   extends: .unit_test_esp32c6_template
-  parallel: 8
+  parallel: 2
   tags:
     - ESP32C6_IDF
     - UT_T1_1
 
 UT_H2:
   extends: .unit_test_esp32h2_template
-  parallel: 5
   tags:
     - ESP32H2_IDF
     - UT_T1_1
 
 UT_S3:
   extends: .unit_test_esp32s3_template
-  parallel: 9
-  tags:
-    - ESP32S3_IDF
-    - UT_T1_1
-
-UT_S3_FLASH:
-  extends: .unit_test_esp32s3_template
-  tags:
-    - ESP32S3_IDF
-    - UT_T1_ESP_FLASH
-
-
-UT_S3_QUAD_PSRAM:
-  extends: .unit_test_esp32s3_template
   parallel: 2
   tags:
     - ESP32S3_IDF
     - UT_T1_1
-    - quad_psram
 
 .integration_test_template:
   extends:

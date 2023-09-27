@@ -154,6 +154,22 @@ menu "Hardware Settings"
 
                 If you are seeing "flash read err, 1000" message printed to the
                 console after deep sleep reset, try increasing this value.
+
+        config ESP_SLEEP_CACHE_SAFE_ASSERTION
+            bool "Check the cache safety of the sleep wakeup code in sleep process"
+            default n
+            help
+                Enabling it will check the cache safety of the code before the flash power is ready after
+                light sleep wakeup, and check PM_SLP_IRAM_OPT related code cache safety. This option is
+                only for code quality inspection. Enabling it will increase the time overhead of entering
+                and exiting sleep. It is not recommended to enable it in the release version.
+
+        config ESP_SLEEP_DEBUG
+            bool "esp sleep debug"
+            default n
+            help
+                Enable esp sleep debug.
+
     endmenu
 
     menu "ESP_SLEEP_WORKAROUND"
@@ -208,6 +224,13 @@ menu "Hardware Settings"
                 This will ensure the GDMA interrupt handler is IRAM-Safe, allow to avoid flash
                 cache misses, and also be able to run whilst the cache is disabled.
                 (e.g. SPI Flash write).
+
+        config GDMA_ENABLE_DEBUG_LOG
+            bool "Enable debug log"
+            default n
+            help
+                Wether to enable the debug log message for GDMA driver.
+                Note that, this option only controls the GDMA driver log, won't affect other drivers.
     endmenu # GDMA Configuration
 
     menu "Main XTAL Config"
@@ -289,4 +312,15 @@ menu "Hardware Settings"
             default 3 if ESP_CRYPTO_DPA_PROTECTION_LEVEL_HIGH
 
     endmenu
+
+    # Invisible bringup bypass options for esp_hw_support component
+    config ESP_BRINGUP_BYPASS_CPU_CLK_SETTING
+        bool
+        default y if !SOC_CLK_TREE_SUPPORTED
+        default n
+        help
+            This option is only used for new chip bringup, when
+            clock support isn't done yet. So with this option,
+            we use xtal on FPGA as the clock source.
+
 endmenu

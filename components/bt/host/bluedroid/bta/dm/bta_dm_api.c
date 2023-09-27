@@ -226,6 +226,7 @@ void BTA_DmConfigEir(tBTA_DM_EIR_CONF *eir_config)
         p_msg->hdr.event = BTA_DM_API_CONFIG_EIR_EVT;
 
         p_msg->eir_fec_required = eir_config->bta_dm_eir_fec_required;
+        p_msg->eir_included_name = eir_config->bta_dm_eir_included_name;
         p_msg->eir_included_tx_power = eir_config->bta_dm_eir_included_tx_power;
         p_msg->eir_included_uuid = eir_config->bta_dm_eir_included_uuid;
         p_msg->eir_flags = eir_config->bta_dm_eir_flags;
@@ -266,6 +267,51 @@ void BTA_DmSetAfhChannels(const uint8_t *channels, tBTA_CMPL_CB  *set_afh_cb)
 
         p_msg->set_afh_cb = set_afh_cb;
         memcpy(p_msg->channels, channels, AFH_CHANNELS_LEN);
+
+        bta_sys_sendmsg(p_msg);
+    }
+}
+
+/*******************************************************************************
+**
+** Function         BTA_DmSetPageTimeout
+**
+** Description      This function sets the Bluetooth page timeout.
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_DmSetPageTimeout(UINT16 page_to, tBTM_CMPL_CB *p_cb)
+{
+    tBTA_DM_API_PAGE_TO_SET *p_msg;
+
+    if ((p_msg = (tBTA_DM_API_PAGE_TO_SET *) osi_malloc(sizeof(tBTA_DM_API_PAGE_TO_SET))) != NULL) {
+        p_msg->hdr.event = BTA_DM_API_PAGE_TO_SET_EVT;
+        p_msg->page_to = page_to;
+        p_msg->set_page_to_cb = p_cb;
+
+        bta_sys_sendmsg(p_msg);
+    }
+}
+
+/*******************************************************************************
+**
+** Function         BTA_DmGetPageTimeout
+**
+** Description      This function gets the Bluetooth page timeout.
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_DmGetPageTimeout(tBTM_CMPL_CB *p_cb)
+{
+    tBTA_DM_API_PAGE_TO_GET *p_msg;
+
+    if ((p_msg = (tBTA_DM_API_PAGE_TO_GET *) osi_malloc(sizeof(tBTA_DM_API_PAGE_TO_GET))) != NULL) {
+        p_msg->hdr.event = BTA_DM_API_PAGE_TO_GET_EVT;
+        p_msg->get_page_to_cb = p_cb;
 
         bta_sys_sendmsg(p_msg);
     }
@@ -756,7 +802,7 @@ void BTA_DmSecureConnectionCreateOobData(void)
 ** Returns          void
 **
 *******************************************************************************/
-#if (SMP_INCLUDED == TRUE)
+#if (CLASSIC_BT_INCLUDED == TRUE)
 void BTA_DmConfirm(BD_ADDR bd_addr, BOOLEAN accept)
 {
     tBTA_DM_API_CONFIRM    *p_msg;
@@ -779,7 +825,6 @@ void BTA_DmConfirm(BD_ADDR bd_addr, BOOLEAN accept)
 ** Returns          void
 **
 *******************************************************************************/
-#if (BT_SSP_INCLUDED == TRUE)
 void BTA_DmPasskeyReqReply(BOOLEAN accept, BD_ADDR bd_addr, UINT32 passkey)
 {
     tBTA_DM_API_KEY_REQ    *p_msg;
@@ -791,8 +836,7 @@ void BTA_DmPasskeyReqReply(BOOLEAN accept, BD_ADDR bd_addr, UINT32 passkey)
         bta_sys_sendmsg(p_msg);
     }
 }
-#endif ///BT_SSP_INCLUDED == TRUE
-#endif  ///SMP_INCLUDED == TRUE
+#endif ///CLASSIC_BT_INCLUDED == TRUE
 /*******************************************************************************
 **
 ** Function         BTA_DmAddDevice
@@ -2853,7 +2897,7 @@ void BTA_DmBleGapConfigExtAdvDataRaw(BOOLEAN is_scan_rsp, UINT8 instance, UINT16
         p_msg->is_scan_rsp = is_scan_rsp;
         p_msg->instance = instance;
         p_msg->length = length;
-        p_msg->data = (UINT8 *)(p_msg + 1);
+        p_msg->data = length != 0 ? (UINT8 *)(p_msg + 1) : NULL;
         if (data) {
             memcpy(p_msg->data, data, length);
         }
@@ -2932,7 +2976,7 @@ void BTA_DmBleGapPeriodicAdvSetParams(UINT8 instance,
 }
 
 void BTA_DmBleGapPeriodicAdvCfgDataRaw(UINT8 instance, UINT16 length,
-                                                           const UINT8 *data)
+                                                           const UINT8 *data,bool only_update_did)
 {
     tBTA_DM_API_CFG_PERIODIC_ADV_DATA *p_msg;
     APPL_TRACE_API("%s, Periodic ADV config data raw.", __func__);
@@ -2943,6 +2987,8 @@ void BTA_DmBleGapPeriodicAdvCfgDataRaw(UINT8 instance, UINT16 length,
         p_msg->length = length;
         p_msg->data = (UINT8 *)(p_msg + 1);
         memcpy(p_msg->data, data, length);
+        p_msg->data = length != 0 ? (UINT8 *)(p_msg + 1) : NULL;
+        p_msg->only_update_did = only_update_did;
         //start sent the msg to the bta system control moudle
         bta_sys_sendmsg(p_msg);
     } else {
@@ -2951,7 +2997,7 @@ void BTA_DmBleGapPeriodicAdvCfgDataRaw(UINT8 instance, UINT16 length,
 
 }
 
-void BTA_DmBleGapPeriodicAdvEnable(BOOLEAN enable, UINT8 instance)
+void BTA_DmBleGapPeriodicAdvEnable(UINT8 enable, UINT8 instance)
 {
     tBTA_DM_API_ENABLE_PERIODIC_ADV *p_msg;
     APPL_TRACE_API("%s, Periodic ADV %s.", __func__, enable ? "start" : "stop");
@@ -3160,16 +3206,70 @@ void BTA_DmBleGapExtConnect(tBLE_ADDR_TYPE own_addr_type, const BD_ADDR peer_add
 #endif // #if (BLE_50_FEATURE_SUPPORT == TRUE)
 
 #if (BLE_FEAT_PERIODIC_ADV_SYNC_TRANSFER == TRUE)
-uint8_t BTA_DmBlePeriodicAdvSetInfoTrans(uint8_t addr[6], uint16_t service_data, uint8_t adv_handle)
+void BTA_DmBleGapPeriodicAdvRecvEnable(UINT16 sync_handle, UINT8 enable)
 {
-    BTM_BlePeriodicAdvSetInfoTrans(addr, service_data, adv_handle);
-    return 0;
+    tBTA_DM_API_PERIODIC_ADV_RECV_ENABLE *p_msg;
+    p_msg = (tBTA_DM_API_PERIODIC_ADV_RECV_ENABLE *) osi_malloc(sizeof(tBTA_DM_API_PERIODIC_ADV_RECV_ENABLE));
+    if (p_msg != NULL) {
+        memset(p_msg, 0, sizeof(tBTA_DM_API_PERIODIC_ADV_RECV_ENABLE));
+        p_msg->hdr.event = BTA_DM_API_PERIODIC_ADV_RECV_ENABLE_EVT;
+        p_msg->sync_handle = sync_handle;
+        p_msg->enable = enable;
+        //start sent the msg to the bta system control moudle
+        bta_sys_sendmsg(p_msg);
+    } else {
+        APPL_TRACE_ERROR("%s malloc failed", __func__);
+    }
 }
 
-uint8_t BTA_DmBleSetPeriodicAdvSyncTransParams(uint8_t addr[6], uint8_t mode, uint16_t skip, uint16_t sync_timeout)
+void BTA_DmBleGapPeriodicAdvSyncTrans(BD_ADDR peer_addr, UINT16 service_data, UINT16 sync_handle)
 {
-    BTM_BleSetPeriodicAdvSyncTransParams(addr, mode, skip, sync_timeout, 0);
-    return 0;
+    tBTA_DM_API_PERIODIC_ADV_SYNC_TRANS *p_msg;
+    p_msg = (tBTA_DM_API_PERIODIC_ADV_SYNC_TRANS *) osi_malloc(sizeof(tBTA_DM_API_PERIODIC_ADV_SYNC_TRANS));
+    if (p_msg != NULL) {
+        memset(p_msg, 0, sizeof(tBTA_DM_API_PERIODIC_ADV_SYNC_TRANS));
+        p_msg->hdr.event = BTA_DM_API_PERIODIC_ADV_SYNC_TRANS_EVT;
+        memcpy(p_msg->addr, peer_addr, sizeof(BD_ADDR));
+        p_msg->service_data = service_data;
+        p_msg->sync_handle = sync_handle;
+        //start sent the msg to the bta system control moudle
+        bta_sys_sendmsg(p_msg);
+    } else {
+        APPL_TRACE_ERROR("%s malloc failed", __func__);
+    }
+}
+
+void BTA_DmBleGapPeriodicAdvSetInfoTrans(BD_ADDR peer_addr, UINT16 service_data, UINT8 adv_handle)
+{
+    tBTA_DM_API_PERIODIC_ADV_SET_INFO_TRANS *p_msg;
+    p_msg = (tBTA_DM_API_PERIODIC_ADV_SET_INFO_TRANS *) osi_malloc(sizeof(tBTA_DM_API_PERIODIC_ADV_SET_INFO_TRANS));
+    if (p_msg != NULL) {
+        memset(p_msg, 0, sizeof(tBTA_DM_API_PERIODIC_ADV_SET_INFO_TRANS));
+        p_msg->hdr.event = BTA_DM_API_PERIODIC_ADV_SET_INFO_TRANS_EVT;
+        memcpy(p_msg->addr, peer_addr, sizeof(BD_ADDR));
+        p_msg->service_data = service_data;
+        p_msg->adv_hanlde = adv_handle;
+        //start sent the msg to the bta system control moudle
+        bta_sys_sendmsg(p_msg);
+    } else {
+        APPL_TRACE_ERROR("%s malloc failed", __func__);
+    }
+}
+
+void BTA_DmBleGapSetPeriodicAdvSyncTransParams(BD_ADDR peer_addr, tBTA_DM_BLE_PAST_PARAMS *params)
+{
+    tBTA_DM_API_SET_PAST_PARAMS *p_msg;
+    p_msg = (tBTA_DM_API_SET_PAST_PARAMS *) osi_malloc(sizeof(tBTA_DM_API_SET_PAST_PARAMS));
+    if (p_msg != NULL) {
+        memset(p_msg, 0, sizeof(tBTA_DM_API_SET_PAST_PARAMS));
+        p_msg->hdr.event = BTA_DM_API_SET_PERIODIC_ADV_SYNC_TRANS_PARAMS_EVT;
+        memcpy(p_msg->addr, peer_addr, sizeof(BD_ADDR));
+        memcpy(&p_msg->params, params, sizeof(tBTA_DM_BLE_PAST_PARAMS));
+        //start sent the msg to the bta system control moudle
+        bta_sys_sendmsg(p_msg);
+    } else {
+        APPL_TRACE_ERROR("%s malloc failed", __func__);
+    }
 }
 #endif // #if (BLE_FEAT_PERIODIC_ADV_SYNC_TRANSFER == TRUE)
 

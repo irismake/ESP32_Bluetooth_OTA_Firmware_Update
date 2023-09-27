@@ -83,6 +83,10 @@ if(CONFIG_SOC_MCPWM_SUPPORTED)
     list(APPEND srcs "${target}/mcpwm_periph.c")
 endif()
 
+if(CONFIG_SOC_MPI_SUPPORTED)
+    list(APPEND srcs "${target}/mpi_periph.c")
+endif()
+
 if(CONFIG_SOC_SDMMC_HOST_SUPPORTED)
     list(APPEND srcs "${target}/sdmmc_periph.c")
 endif()
@@ -96,7 +100,9 @@ if(CONFIG_SOC_TWAI_SUPPORTED)
 endif()
 
 if(CONFIG_SOC_IEEE802154_SUPPORTED)
-    list(APPEND srcs "${target}/ieee802154_periph.c")
+    if(NOT target STREQUAL "esp32h4")
+        list(APPEND srcs "${target}/ieee802154_periph.c")
+    endif()
 endif()
 
 if(CONFIG_SOC_USB_OTG_SUPPORTED)
@@ -124,6 +130,8 @@ idf_component_register(SRCS ${srcs}
 # For IDF, we define it according to the Flash size that user selects
 # Replace this value in an adaptive way, if Kconfig isn't available on your platform
 target_compile_definitions(${COMPONENT_LIB} INTERFACE SOC_MMU_PAGE_SIZE=CONFIG_MMU_PAGE_SIZE)
+
+target_compile_definitions(${COMPONENT_LIB} INTERFACE SOC_XTAL_FREQ_MHZ=CONFIG_XTAL_FREQ)
 
 if(target STREQUAL "esp32")
     # esp_dport_access_reg_read is added as an undefined symbol because otherwise

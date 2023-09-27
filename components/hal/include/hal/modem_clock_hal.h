@@ -8,14 +8,15 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "soc/soc_caps.h"
+#if SOC_MODEM_CLOCK_IS_INDEPENDENT
 #include "hal/modem_syscon_ll.h"
 #include "hal/modem_lpcon_ll.h"
 #include "hal/modem_clock_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     modem_syscon_dev_t *syscon_dev;
@@ -48,3 +49,5 @@ void modem_clock_hal_enable_wifipwr_clock(modem_clock_hal_context_t *hal, bool e
 #ifdef __cplusplus
 }
 #endif
+
+#endif  // SOC_MODEM_CLOCK_IS_INDEPENDENT

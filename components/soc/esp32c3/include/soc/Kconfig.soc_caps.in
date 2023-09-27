@@ -19,6 +19,10 @@ config SOC_GDMA_SUPPORTED
     bool
     default y
 
+config SOC_AHB_GDMA_SUPPORTED
+    bool
+    default y
+
 config SOC_GPTIMER_SUPPORTED
     bool
     default y
@@ -60,6 +64,10 @@ config SOC_EFUSE_KEY_PURPOSE_FIELD
     default y
 
 config SOC_EFUSE_HAS_EFUSE_RST_BUG
+    bool
+    default y
+
+config SOC_EFUSE_SUPPORTED
     bool
     default y
 
@@ -136,6 +144,14 @@ config SOC_MEMPROT_SUPPORTED
     default y
 
 config SOC_BOD_SUPPORTED
+    bool
+    default y
+
+config SOC_CLK_TREE_SUPPORTED
+    bool
+    default y
+
+config SOC_ASSIST_DEBUG_SUPPORTED
     bool
     default y
 
@@ -247,6 +263,10 @@ config SOC_ADC_SELF_HW_CALI_SUPPORTED
     bool
     default y
 
+config SOC_ADC_SHARED_POWER
+    bool
+    default y
+
 config SOC_APB_BACKUP_DMA
     bool
     default y
@@ -299,17 +319,17 @@ config SOC_DS_KEY_CHECK_MAX_WAIT_US
     int
     default 1100
 
-config SOC_GDMA_GROUPS
+config SOC_AHB_GDMA_VERSION
     int
     default 1
 
-config SOC_GDMA_PAIRS_PER_GROUP
+config SOC_GDMA_NUM_GROUPS_MAX
+    int
+    default 1
+
+config SOC_GDMA_PAIRS_PER_GROUP_MAX
     int
     default 3
-
-config SOC_GDMA_TX_RX_SHARE_INTERRUPT
-    bool
-    default y
 
 config SOC_GPIO_PORT
     int
@@ -380,6 +400,10 @@ config SOC_I2C_SUPPORT_XTAL
     default y
 
 config SOC_I2C_SUPPORT_RTC
+    bool
+    default y
+
+config SOC_I2C_SUPPORT_10BIT_ADDR
     bool
     default y
 
@@ -534,6 +558,14 @@ config SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM
 config SOC_RTCIO_PIN_COUNT
     int
     default 0
+
+config SOC_MPI_MEM_BLOCKS_NUM
+    int
+    default 4
+
+config SOC_MPI_OPERATIONS_NUM
+    int
+    default 3
 
 config SOC_RSA_MAX_BIT_LEN
     int
@@ -731,6 +763,10 @@ config SOC_TIMER_GROUP_TOTAL_TIMERS
     int
     default 2
 
+config SOC_MWDT_SUPPORT_XTAL
+    bool
+    default y
+
 config SOC_TWAI_CONTROLLER_NUM
     int
     default 1
@@ -816,6 +852,10 @@ config SOC_MEMPROT_MEM_ALIGN_SIZE
     default 512
 
 config SOC_UART_NUM
+    int
+    default 2
+
+config SOC_UART_HP_NUM
     int
     default 2
 

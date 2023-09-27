@@ -237,10 +237,31 @@ template <> otError Interpreter::Process<Cmd("version")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli version
+     * @code
+     * version
+     * OPENTHREAD/gf4f2f04; Jul 1 2016 17:00:09
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otGetVersionString
+     */
     if (aArgs[0].IsEmpty())
     {
         OutputLine("%s", otGetVersionString());
     }
+
+    /**
+     * @cli version api
+     * @code
+     * version api
+     * 28
+     * Done
+     * @endcode
+     * @par
+     * Prints the API version number.
+     */
     else if (aArgs[0] == "api")
     {
         OutputLine("%u", OPENTHREAD_API_VERSION);
@@ -2327,23 +2348,22 @@ template <> otError Interpreter::Process<Cmd("csl")>(Arg aArgs[])
      * @code
      * csl
      * Channel: 11
-     * Period: 1000 (in units of 10 symbols), 160ms
+     * Period: 160000us
      * Timeout: 1000s
      * Done
      * @endcode
      * @par
      * Gets the CSL configuration.
-     * @sa otLinkCslGetChannel
-     * @sa otLinkCslGetPeriod
-     * @sa otLinkCslGetPeriod
-     * @sa otLinkCslGetTimeout
+     * @sa otLinkGetCslChannel
+     * @sa otLinkGetCslPeriod
+     * @sa otLinkGetCslPeriod
+     * @sa otLinkGetCslTimeout
      */
     if (aArgs[0].IsEmpty())
     {
-        OutputLine("Channel: %u", otLinkCslGetChannel(GetInstancePtr()));
-        OutputLine("Period: %u(in units of 10 symbols), %lums", otLinkCslGetPeriod(GetInstancePtr()),
-                   ToUlong(otLinkCslGetPeriod(GetInstancePtr()) * kUsPerTenSymbols / 1000));
-        OutputLine("Timeout: %lus", ToUlong(otLinkCslGetTimeout(GetInstancePtr())));
+        OutputLine("Channel: %u", otLinkGetCslChannel(GetInstancePtr()));
+        OutputLine("Period: %luus", ToUlong(otLinkGetCslPeriod(GetInstancePtr())));
+        OutputLine("Timeout: %lus", ToUlong(otLinkGetCslTimeout(GetInstancePtr())));
     }
     /**
      * @cli csl channel
@@ -2353,25 +2373,25 @@ template <> otError Interpreter::Process<Cmd("csl")>(Arg aArgs[])
      * @endcode
      * @cparam csl channel @ca{channel}
      * @par api_copy
-     * #otLinkCslSetChannel
+     * #otLinkSetCslChannel
      */
     else if (aArgs[0] == "channel")
     {
-        error = ProcessSet(aArgs + 1, otLinkCslSetChannel);
+        error = ProcessSet(aArgs + 1, otLinkSetCslChannel);
     }
     /**
      * @cli csl period
      * @code
-     * csl period 3000
+     * csl period 3000000
      * Done
      * @endcode
      * @cparam csl period @ca{period}
      * @par api_copy
-     * #otLinkCslSetPeriod
+     * #otLinkSetCslPeriod
      */
     else if (aArgs[0] == "period")
     {
-        error = ProcessSet(aArgs + 1, otLinkCslSetPeriod);
+        error = ProcessSet(aArgs + 1, otLinkSetCslPeriod);
     }
     /**
      * @cli csl timeout
@@ -2381,11 +2401,11 @@ template <> otError Interpreter::Process<Cmd("csl")>(Arg aArgs[])
      * @endcode
      * @cparam csl timeout @ca{timeout}
      * @par api_copy
-     * #otLinkCslSetTimeout
+     * #otLinkSetCslTimeout
      */
     else if (aArgs[0] == "timeout")
     {
-        error = ProcessSet(aArgs + 1, otLinkCslSetTimeout);
+        error = ProcessSet(aArgs + 1, otLinkSetCslTimeout);
     }
     else
     {
@@ -2443,23 +2463,57 @@ exit:
 }
 #endif
 
+/**
+ * @cli detach
+ * @code
+ * detach
+ * Finished detaching
+ * Done
+ * @endcode
+ * @par
+ * Start the graceful detach process by first notifying other nodes (sending Address Release if acting as a router, or
+ * setting Child Timeout value to zero on parent if acting as a child) and then stopping Thread protocol operation.
+ * @sa otThreadDetachGracefully
+ */
 template <> otError Interpreter::Process<Cmd("detach")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli detach async
+     * @code
+     * detach async
+     * Done
+     * @endcode
+     * @par
+     * Start the graceful detach process similar to the `detach` command without blocking and waiting for the callback
+     * indicating that detach is finished.
+     * @csa{detach}
+     * @sa otThreadDetachGracefully
+     */
     if (aArgs[0] == "async")
     {
         SuccessOrExit(error = otThreadDetachGracefully(GetInstancePtr(), nullptr, nullptr));
     }
     else
     {
-        SuccessOrExit(error =
-                          otThreadDetachGracefully(GetInstancePtr(), &Interpreter::HandleDetachGracefullyResult, this));
+        SuccessOrExit(error = otThreadDetachGracefully(GetInstancePtr(), HandleDetachGracefullyResult, this));
         error = OT_ERROR_PENDING;
     }
 
 exit:
     return error;
+}
+
+void Interpreter::HandleDetachGracefullyResult(void *aContext)
+{
+    static_cast<Interpreter *>(aContext)->HandleDetachGracefullyResult();
+}
+
+void Interpreter::HandleDetachGracefullyResult(void)
+{
+    OutputLine("Finished detaching");
+    OutputResult(OT_ERROR_NONE);
 }
 
 /**
@@ -2689,6 +2743,17 @@ template <> otError Interpreter::Process<Cmd("log")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli log level
+     * @code
+     * log level
+     * 1
+     * Done
+     * @endcode
+     * @par
+     * Get the log level.
+     * @sa otLoggingGetLevel
+     */
     if (aArgs[0] == "level")
     {
         if (aArgs[1].IsEmpty())
@@ -2700,6 +2765,16 @@ template <> otError Interpreter::Process<Cmd("log")>(Arg aArgs[])
 #if OPENTHREAD_CONFIG_LOG_LEVEL_DYNAMIC_ENABLE
             uint8_t level;
 
+            /**
+             * @cli log level (set)
+             * @code
+             * log level 4
+             * Done
+             * @endcode
+             * @par api_copy
+             * #otLoggingSetLevel
+             * @cparam log level @ca{level}
+             */
             VerifyOrExit(aArgs[2].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
             SuccessOrExit(error = aArgs[1].ParseAsUint8(level));
             error = otLoggingSetLevel(static_cast<otLogLevel>(level));
@@ -2709,6 +2784,18 @@ template <> otError Interpreter::Process<Cmd("log")>(Arg aArgs[])
         }
     }
 #if (OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_DEBUG_UART) && OPENTHREAD_POSIX
+    /**
+     * @cli log filename
+     * @par
+     * Specifies filename to capture `otPlatLog()` messages, useful when debugging
+     * automated test scripts on Linux when logging disrupts the automated test scripts.
+     * @par
+     * Requires `OPENTHREAD_CONFIG_LOG_OUTPUT == OPENTHREAD_CONFIG_LOG_OUTPUT_DEBUG_UART`
+     * and `OPENTHREAD_POSIX`.
+     * @par api_copy
+     * #otPlatDebugUart_logfile
+     * @cparam log filename @ca{filename}
+     */
     else if (aArgs[0] == "filename")
     {
         VerifyOrExit(!aArgs[1].IsEmpty(), error = OT_ERROR_INVALID_ARGS);
@@ -3542,7 +3629,7 @@ exit:
 #if OPENTHREAD_CONFIG_MLE_LINK_METRICS_INITIATOR_ENABLE
 void Interpreter::HandleLinkMetricsReport(const otIp6Address        *aAddress,
                                           const otLinkMetricsValues *aMetricsValues,
-                                          uint8_t                    aStatus,
+                                          otLinkMetricsStatus        aStatus,
                                           void                      *aContext)
 {
     static_cast<Interpreter *>(aContext)->HandleLinkMetricsReport(aAddress, aMetricsValues, aStatus);
@@ -3575,7 +3662,7 @@ void Interpreter::PrintLinkMetricsValue(const otLinkMetricsValues *aMetricsValue
 
 void Interpreter::HandleLinkMetricsReport(const otIp6Address        *aAddress,
                                           const otLinkMetricsValues *aMetricsValues,
-                                          uint8_t                    aStatus)
+                                          otLinkMetricsStatus        aStatus)
 {
     OutputFormat("Received Link Metrics Report from: ");
     OutputIp6AddressLine(*aAddress);
@@ -3596,12 +3683,14 @@ void Interpreter::HandleLinkMetricsReport(const otIp6Address        *aAddress,
     }
 }
 
-void Interpreter::HandleLinkMetricsMgmtResponse(const otIp6Address *aAddress, uint8_t aStatus, void *aContext)
+void Interpreter::HandleLinkMetricsMgmtResponse(const otIp6Address *aAddress,
+                                                otLinkMetricsStatus aStatus,
+                                                void               *aContext)
 {
     static_cast<Interpreter *>(aContext)->HandleLinkMetricsMgmtResponse(aAddress, aStatus);
 }
 
-void Interpreter::HandleLinkMetricsMgmtResponse(const otIp6Address *aAddress, uint8_t aStatus)
+void Interpreter::HandleLinkMetricsMgmtResponse(const otIp6Address *aAddress, otLinkMetricsStatus aStatus)
 {
     OutputFormat("Received Link Metrics Management Response from: ");
     OutputIp6AddressLine(*aAddress);
@@ -3631,7 +3720,7 @@ void Interpreter::HandleLinkMetricsEnhAckProbingIe(otShortAddress             aS
     }
 }
 
-const char *Interpreter::LinkMetricsStatusToStr(uint8_t aStatus)
+const char *Interpreter::LinkMetricsStatusToStr(otLinkMetricsStatus aStatus)
 {
     static const char *const kStatusStrings[] = {
         "Success",                      // (0) OT_LINK_METRICS_STATUS_SUCCESS
@@ -3990,12 +4079,51 @@ template <> otError Interpreter::Process<Cmd("locate")>(Arg aArgs[])
     otError      error = OT_ERROR_INVALID_ARGS;
     otIp6Address anycastAddress;
 
+    /**
+     * @cli locate
+     * @code
+     * locate
+     * Idle
+     * Done
+     * @endcode
+     * @code
+     * locate fdde:ad00:beef:0:0:ff:fe00:fc10
+     * @endcode
+     * @code
+     * locate
+     * In Progress
+     * Done
+     * @endcode
+     * @par
+     * Gets the current state (`In Progress` or `Idle`) of anycast locator.
+     * @par
+     * Available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.
+     * @sa otThreadIsAnycastLocateInProgress
+     */
     if (aArgs[0].IsEmpty())
     {
         OutputLine(otThreadIsAnycastLocateInProgress(GetInstancePtr()) ? "In Progress" : "Idle");
         ExitNow(error = OT_ERROR_NONE);
     }
 
+    /**
+     * @cli locate (set)
+     * @code
+     * locate fdde:ad00:beef:0:0:ff:fe00:fc00
+     * fdde:ad00:beef:0:d9d3:9000:16b:d03b 0xc800
+     * Done
+     * @endcode
+     * @par
+     * Locate the closest destination of an anycast address (i.e., find the
+     * destination's mesh local EID and RLOC16).
+     * @par
+     * The closest destination is determined based on the current routing
+     * table and path costs within the Thread mesh.
+     * @par
+     * Available when `OPENTHREAD_CONFIG_TMF_ANYCAST_LOCATOR_ENABLE` is enabled.
+     * @sa otThreadLocateAnycastDestination
+     * @cparam locate @ca{anycastaddr}
+     */
     SuccessOrExit(error = aArgs[0].ParseAsIp6Address(anycastAddress));
     SuccessOrExit(error =
                       otThreadLocateAnycastDestination(GetInstancePtr(), &anycastAddress, HandleLocateResult, this));
@@ -4041,17 +4169,48 @@ template <> otError Interpreter::Process<Cmd("pskc")>(Arg aArgs[])
     otError error = OT_ERROR_NONE;
     otPskc  pskc;
 
+    /**
+     * @cli pskc
+     * @code
+     * pskc
+     * 67c0c203aa0b042bfb5381c47aef4d9e
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otThreadGetPskc
+     */
     if (aArgs[0].IsEmpty())
     {
         otThreadGetPskc(GetInstancePtr(), &pskc);
         OutputBytesLine(pskc.m8);
     }
     else
+    /**
+     * @cli pskc (set)
+     * @code
+     * pskc 67c0c203aa0b042bfb5381c47aef4d9e
+     * Done
+     * @endcode
+     * @cparam pskc @ca{key}
+     * @par
+     * Sets the pskc in hexadecimal format.
+     */
     {
         if (aArgs[1].IsEmpty())
         {
             SuccessOrExit(error = aArgs[0].ParseAsHexString(pskc.m8));
         }
+        /**
+         * @cli pskc -p
+         * @code
+         * pskc -p 123456
+         * Done
+         * @endcode
+         * @cparam pskc -p @ca{passphrase}
+         * @par
+         * Generates the pskc from the passphrase (UTF-8 encoded), together with the current network name and extended
+         * PAN ID.
+         */
         else if (aArgs[0] == "-p")
         {
             SuccessOrExit(error = otDatasetGeneratePskc(
@@ -4076,6 +4235,16 @@ template <> otError Interpreter::Process<Cmd("pskcref")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli pskcref
+     * @code
+     * pskcref
+     * 0x80000000
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otThreadGetPskcRef
+     */
     if (aArgs[0].IsEmpty())
     {
         OutputLine("0x%08lx", ToUlong(otThreadGetPskcRef(GetInstancePtr())));
@@ -4084,6 +4253,16 @@ template <> otError Interpreter::Process<Cmd("pskcref")>(Arg aArgs[])
     {
         otPskcRef pskcRef;
 
+        /**
+         * @cli pskcref (set)
+         * @code
+         * pskc 0x20017
+         * Done
+         * @endcode
+         * @cparam pskc @ca{keyref}
+         * @par api_copy
+         * #otThreadSetPskcRef
+         */
         if (aArgs[1].IsEmpty())
         {
             SuccessOrExit(error = aArgs[0].ParseAsUint32(pskcRef));
@@ -4101,6 +4280,23 @@ exit:
 }
 #endif
 #endif // OPENTHREAD_FTD
+
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
+/**
+ * @cli mleadvimax
+ * @code
+ * mleadvimax
+ * 12000
+ * Done
+ * @endcode
+ * @par api_copy
+ * #otThreadGetAdvertisementTrickleIntervalMax
+ */
+template <> otError Interpreter::Process<Cmd("mleadvimax")>(Arg aArgs[])
+{
+    return ProcessGet(aArgs, otThreadGetAdvertisementTrickleIntervalMax);
+}
+#endif
 
 #if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
 /**
@@ -5206,7 +5402,7 @@ void Interpreter::HandleMeshDiagDiscoverDone(otError aError, otMeshDiagRouterInf
         {
             OutputFormat(kIndentSize, "%u-links:{ ", linkQuality);
 
-            for (uint8_t id = 0; id < OT_ARRAY_LENGTH(aRouterInfo->mLinkQualities); id++)
+            for (uint8_t id = 0; id < static_cast<uint8_t>(OT_ARRAY_LENGTH(aRouterInfo->mLinkQualities)); id++)
             {
                 if (aRouterInfo->mLinkQualities[id] == linkQuality)
                 {
@@ -5772,6 +5968,17 @@ template <> otError Interpreter::Process<Cmd("promiscuous")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli promiscuous
+     * @code
+     * promiscuous
+     * Disabled
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otLinkIsPromiscuous
+     * @sa otPlatRadioGetPromiscuous
+     */
     if (aArgs[0].IsEmpty())
     {
         OutputEnabledDisabledStatus(otLinkIsPromiscuous(GetInstancePtr()) &&
@@ -5783,6 +5990,20 @@ template <> otError Interpreter::Process<Cmd("promiscuous")>(Arg aArgs[])
 
         SuccessOrExit(error = ParseEnableOrDisable(aArgs[0], enable));
 
+        /**
+         * @cli promiscuous (enable,disable)
+         * @code
+         * promiscuous enable
+         * Done
+         * @endcode
+         * @code
+         * promiscuous disable
+         * Done
+         * @endcode
+         * @cparam promiscuous @ca{enable|disable}
+         * @par api_copy
+         * #otLinkSetPromiscuous
+         */
         if (!enable)
         {
             otLinkSetPcapCallback(GetInstancePtr(), nullptr, nullptr);
@@ -6063,6 +6284,17 @@ exit:
 }
 #endif // OPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE
 
+/**
+ * @cli preferrouterid
+ * @code
+ * preferrouterid 16
+ * Done
+ * @endcode
+ * @cparam preferrouterid @ca{routerid}
+ * @par
+ * Specifies the preferred router ID that the leader should provide when solicited.
+ * @sa otThreadSetPreferredRouterId
+ */
 #if OPENTHREAD_FTD
 template <> otError Interpreter::Process<Cmd("preferrouterid")>(Arg aArgs[])
 {
@@ -6105,7 +6337,7 @@ template <> otError Interpreter::Process<Cmd("radio")>(Arg aArgs[])
      * radio disable
      * Done
      * @endcode
-     * @cparam radio [@ca{enable|disable}]
+     * @cparam radio @ca{enable|disable}
      * @sa otLinkSetEnabled
      * @par
      * Enables or disables the radio.
@@ -6319,6 +6551,10 @@ otError Interpreter::ParseRoute(Arg aArgs[], otExternalRouteConfig &aConfig)
 
                 case 'n':
                     aConfig.mNat64 = true;
+                    break;
+
+                case 'a':
+                    aConfig.mAdvPio = true;
                     break;
 
                 case '-':
@@ -7158,6 +7394,16 @@ template <> otError Interpreter::Process<Cmd("uptime")>(Arg aArgs[])
 {
     otError error = OT_ERROR_NONE;
 
+    /**
+     * @cli uptime
+     * @code
+     * uptime
+     * 12:46:35.469
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otInstanceGetUptimeAsString
+     */
     if (aArgs[0].IsEmpty())
     {
         char string[OT_UPTIME_STRING_SIZE];
@@ -7165,6 +7411,17 @@ template <> otError Interpreter::Process<Cmd("uptime")>(Arg aArgs[])
         otInstanceGetUptimeAsString(GetInstancePtr(), string, sizeof(string));
         OutputLine("%s", string);
     }
+
+    /**
+     * @cli uptime ms
+     * @code
+     * uptime ms
+     * 426238
+     * Done
+     * @endcode
+     * @par api_copy
+     * #otInstanceGetUptime
+     */
     else if (aArgs[0] == "ms")
     {
         OutputUint64Line(otInstanceGetUptime(GetInstancePtr()));
@@ -7745,17 +8002,6 @@ void Interpreter::OutputChildTableEntry(uint8_t aIndentSize, const otNetworkDiag
 }
 #endif // OPENTHREAD_CONFIG_TMF_NETDIAG_CLIENT_ENABLE
 
-void Interpreter::HandleDetachGracefullyResult(void *aContext)
-{
-    static_cast<Interpreter *>(aContext)->HandleDetachGracefullyResult();
-}
-
-void Interpreter::HandleDetachGracefullyResult(void)
-{
-    OutputLine("Finished detaching");
-    OutputResult(OT_ERROR_NONE);
-}
-
 #if OPENTHREAD_FTD
 void Interpreter::HandleDiscoveryRequest(const otThreadDiscoveryRequestInfo *aInfo, void *aContext)
 {
@@ -8019,6 +8265,9 @@ otError Interpreter::ProcessCommand(Arg aArgs[])
 #endif
 #if OPENTHREAD_CONFIG_MESH_DIAG_ENABLE && OPENTHREAD_FTD
         CmdEntry("meshdiag"),
+#endif
+#if OPENTHREAD_FTD && OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
+        CmdEntry("mleadvimax"),
 #endif
 #if OPENTHREAD_CONFIG_REFERENCE_DEVICE_ENABLE
         CmdEntry("mliid"),

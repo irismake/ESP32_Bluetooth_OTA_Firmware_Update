@@ -23,7 +23,11 @@ else()
 
     # Override regi2c implementation in ROM
     if(CONFIG_ESP_ROM_HAS_REGI2C_BUG OR CONFIG_ESP_ROM_WITHOUT_REGI2C)
-        list(APPEND sources "patches/esp_rom_regi2c_${target}.c")
+        if(target STREQUAL "esp32c6")
+            list(APPEND sources "patches/esp_rom_hp_regi2c_${target}.c")
+        else()
+            list(APPEND sources "patches/esp_rom_regi2c_${target}.c")
+        endif()
     endif()
 
     if(CONFIG_HEAP_TLSF_USE_ROM_IMPL AND CONFIG_ESP_ROM_TLSF_CHECK_PATCH)
@@ -126,6 +130,13 @@ if(BOOTLOADER_BUILD)
         if(CONFIG_HAL_WDT_USE_ROM_IMPL)
             rom_linker_script("wdt")
         endif()
+
+    elseif(target STREQUAL "esp32p4")
+        rom_linker_script("newlib")
+        if(CONFIG_HAL_WDT_USE_ROM_IMPL)
+            rom_linker_script("wdt")
+        endif()
+        rom_linker_script("version")
     endif()
 
 else() # Regular app build
@@ -262,6 +273,21 @@ else() # Regular app build
             rom_linker_script("newlib-nano")
         endif()
 
+    elseif(target STREQUAL "esp32p4")
+        rom_linker_script("newlib")
+        rom_linker_script("version")
+
+        # esp32p4 rom doesn't have esp_flash driver
+
+        if(CONFIG_HAL_WDT_USE_ROM_IMPL)
+            rom_linker_script("wdt")
+        endif()
+
+        if(CONFIG_NEWLIB_NANO_FORMAT)
+            # nano formatting functions in ROM are also built for 64-bit time_t.
+            rom_linker_script("newlib-nano")
+        endif()
+
     endif()
 
     if(CONFIG_HEAP_TLSF_USE_ROM_IMPL)
@@ -282,5 +308,5 @@ else() # Regular app build
 endif()
 
 if(target STREQUAL "esp32s2")
-    target_sources(${COMPONENT_LIB} PRIVATE "esp32s2/usb_descriptors.c")
+    target_sources(${COMPONENT_LIB} PRIVATE "esp32s2/usb_patches.c")
 endif()

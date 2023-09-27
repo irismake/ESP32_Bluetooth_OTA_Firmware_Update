@@ -144,7 +144,12 @@ esp_err_t esp_lcd_new_i80_bus(const esp_lcd_i80_bus_config_t *bus_config, esp_lc
     ESP_GOTO_ON_FALSE(bus_id >= 0, ESP_ERR_NOT_FOUND, err, TAG, "no free i80 bus slot");
     bus->bus_id = bus_id;
     // enable APB to access LCD registers
-    periph_module_enable(lcd_periph_signals.buses[bus_id].module);
+    PERIPH_RCC_ACQUIRE_ATOMIC(lcd_periph_signals.panels[bus_id].module, ref_count) {
+        if (ref_count == 0) {
+            lcd_ll_enable_bus_clock(bus_id, true);
+            lcd_ll_reset_register(bus_id);
+        }
+    }
     // initialize HAL layer, so we can call LL APIs later
     lcd_hal_init(&bus->hal, bus_id);
     // reset peripheral and FIFO
@@ -199,7 +204,11 @@ err:
             gdma_del_channel(bus->dma_chan);
         }
         if (bus->bus_id >= 0) {
-            periph_module_disable(lcd_periph_signals.buses[bus->bus_id].module);
+            PERIPH_RCC_RELEASE_ATOMIC(lcd_periph_signals.panels[bus->bus_id].module, ref_count) {
+                if (ref_count == 0) {
+                    lcd_ll_enable_bus_clock(bus->bus_id, false);
+                }
+            }
             lcd_com_remove_device(LCD_COM_DEVICE_TYPE_I80, bus->bus_id);
         }
         if (bus->format_buffer) {
@@ -220,7 +229,11 @@ esp_err_t esp_lcd_del_i80_bus(esp_lcd_i80_bus_handle_t bus)
     ESP_GOTO_ON_FALSE(LIST_EMPTY(&bus->device_list), ESP_ERR_INVALID_STATE, err, TAG, "device list not empty");
     int bus_id = bus->bus_id;
     lcd_com_remove_device(LCD_COM_DEVICE_TYPE_I80, bus_id);
-    periph_module_disable(lcd_periph_signals.buses[bus_id].module);
+    PERIPH_RCC_RELEASE_ATOMIC(lcd_periph_signals.panels[bus_id].module, ref_count) {
+        if (ref_count == 0) {
+            lcd_ll_enable_bus_clock(bus_id, false);
+        }
+    }
     gdma_disconnect(bus->dma_chan);
     gdma_del_channel(bus->dma_chan);
     esp_intr_free(bus->intr);
@@ -329,6 +342,11 @@ static esp_err_t panel_io_i80_del(esp_lcd_panel_io_t *io)
     portENTER_CRITICAL(&bus->spinlock);
     LIST_REMOVE(i80_device, device_list_entry);
     portEXIT_CRITICAL(&bus->spinlock);
+
+    // reset CS to normal GPIO
+    if (i80_device->cs_gpio_num >= 0) {
+        gpio_reset_pin(i80_device->cs_gpio_num);
+    }
 
     ESP_LOGD(TAG, "del i80 lcd panel io @%p", i80_device);
     vQueueDelete(i80_device->trans_queue);
@@ -522,7 +540,11 @@ static esp_err_t lcd_i80_init_dma_link(esp_lcd_i80_bus_handle_t bus)
     gdma_channel_alloc_config_t dma_chan_config = {
         .direction = GDMA_CHANNEL_DIRECTION_TX,
     };
-    ret = gdma_new_channel(&dma_chan_config, &bus->dma_chan);
+#if SOC_GDMA_TRIG_PERIPH_LCD0_BUS == SOC_GDMA_BUS_AHB
+    ret = gdma_new_ahb_channel(&dma_chan_config, &bus->dma_chan);
+#elif SOC_GDMA_TRIG_PERIPH_LCD0_BUS == SOC_GDMA_BUS_AXI
+    ret = gdma_new_axi_channel(&dma_chan_config, &bus->dma_chan);
+#endif
     ESP_GOTO_ON_ERROR(ret, err, TAG, "alloc DMA channel failed");
     gdma_connect(bus->dma_chan, GDMA_MAKE_TRIGGER(GDMA_TRIG_PERIPH_LCD, 0));
     gdma_strategy_config_t strategy_config = {

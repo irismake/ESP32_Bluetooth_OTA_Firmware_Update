@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -626,6 +626,25 @@ static char *_get_host_header(char *host, int port)
     return host_name;
 }
 
+static bool init_common_tcp_transport(esp_http_client_handle_t client, const esp_http_client_config_t *config, esp_transport_handle_t transport)
+{
+    if (config->keep_alive_enable == true) {
+        client->keep_alive_cfg.keep_alive_enable = true;
+        client->keep_alive_cfg.keep_alive_idle = (config->keep_alive_idle == 0) ? DEFAULT_KEEP_ALIVE_IDLE : config->keep_alive_idle;
+        client->keep_alive_cfg.keep_alive_interval = (config->keep_alive_interval == 0) ? DEFAULT_KEEP_ALIVE_INTERVAL : config->keep_alive_interval;
+        client->keep_alive_cfg.keep_alive_count =  (config->keep_alive_count == 0) ? DEFAULT_KEEP_ALIVE_COUNT : config->keep_alive_count;
+        esp_transport_tcp_set_keep_alive(transport, &client->keep_alive_cfg);
+    }
+
+    if (config->if_name) {
+        client->if_name = calloc(1, sizeof(struct ifreq));
+        ESP_RETURN_ON_FALSE(client->if_name, false, TAG, "Memory exhausted");
+        memcpy(client->if_name, config->if_name, sizeof(struct ifreq));
+        esp_transport_tcp_set_interface_name(transport, client->if_name);
+    }
+    return true;
+}
+
 esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *config)
 {
 
@@ -664,20 +683,7 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
         goto error;
     }
 
-    if (config->keep_alive_enable == true) {
-        client->keep_alive_cfg.keep_alive_enable = true;
-        client->keep_alive_cfg.keep_alive_idle = (config->keep_alive_idle == 0) ? DEFAULT_KEEP_ALIVE_IDLE : config->keep_alive_idle;
-        client->keep_alive_cfg.keep_alive_interval = (config->keep_alive_interval == 0) ? DEFAULT_KEEP_ALIVE_INTERVAL : config->keep_alive_interval;
-        client->keep_alive_cfg.keep_alive_count =  (config->keep_alive_count == 0) ? DEFAULT_KEEP_ALIVE_COUNT : config->keep_alive_count;
-        esp_transport_tcp_set_keep_alive(tcp, &client->keep_alive_cfg);
-    }
-
-    if (config->if_name) {
-        client->if_name = calloc(1, sizeof(struct ifreq) + 1);
-        ESP_GOTO_ON_FALSE(client->if_name, ESP_FAIL, error, TAG, "Memory exhausted");
-        memcpy(client->if_name, config->if_name, sizeof(struct ifreq));
-        esp_transport_tcp_set_interface_name(tcp, client->if_name);
-    }
+    ESP_GOTO_ON_FALSE(init_common_tcp_transport(client, config, tcp), ESP_FAIL, error, TAG, "Failed to set TCP config");
 
 #ifdef CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS
     esp_transport_handle_t ssl = NULL;
@@ -691,6 +697,8 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
         ESP_LOGE(TAG, "Error initialize SSL Transport");
         goto error;
     }
+
+    ESP_GOTO_ON_FALSE(init_common_tcp_transport(client, config, ssl), ESP_FAIL, error, TAG, "Failed to set SSL config");
 
     if (config->crt_bundle_attach != NULL) {
 #ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
@@ -722,6 +730,12 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
     }
 #endif
 
+#if CONFIG_ESP_TLS_USE_DS_PERIPHERAL
+    if (config->ds_data != NULL) {
+        esp_transport_ssl_set_ds_data(ssl, config->ds_data);
+    }
+#endif
+
     if (config->client_key_pem) {
         if (!config->client_key_len) {
             esp_transport_ssl_set_client_key_data(ssl, config->client_key_pem, strlen(config->client_key_pem));
@@ -729,7 +743,11 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
             esp_transport_ssl_set_client_key_data_der(ssl, config->client_key_pem, config->client_key_len);
         }
     }
-
+#ifdef CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
+    if (config->use_ecdsa_peripheral) {
+        esp_transport_ssl_set_client_key_ecdsa_peripheral(ssl, config->ecdsa_key_efuse_blk);
+    }
+#endif
     if (config->client_key_password && config->client_key_password_len > 0) {
         esp_transport_ssl_set_client_key_password(ssl, config->client_key_password, config->client_key_password_len);
     }
@@ -1139,7 +1157,7 @@ int esp_http_client_read(esp_http_client_handle_t client, char *buffer, int len)
         } else {
             is_data_remain = client->response->data_process < client->response->content_length;
         }
-        ESP_LOGD(TAG, "is_data_remain=%"PRId8", is_chunked=%d"PRId8", content_length=%"PRId64, is_data_remain, client->response->is_chunked, client->response->content_length);
+        ESP_LOGD(TAG, "is_data_remain=%d, is_chunked=%d, content_length=%"PRId64, is_data_remain, client->response->is_chunked, client->response->content_length);
         if (!is_data_remain) {
             break;
         }
@@ -1489,9 +1507,9 @@ static esp_err_t esp_http_client_request_send(esp_http_client_handle_t client, i
 
     client->data_written_index = 0;
     client->data_write_left = client->post_len;
+    client->state = HTTP_STATE_REQ_COMPLETE_HEADER;
     http_dispatch_event(client, HTTP_EVENT_HEADERS_SENT, NULL, 0);
     http_dispatch_event_to_event_loop(HTTP_EVENT_HEADERS_SENT, &client, sizeof(esp_http_client_handle_t));
-    client->state = HTTP_STATE_REQ_COMPLETE_HEADER;
     return ESP_OK;
 }
 

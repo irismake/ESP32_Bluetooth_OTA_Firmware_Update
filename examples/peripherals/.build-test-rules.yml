@@ -1,5 +1,12 @@
 # Documentation: .gitlab/ci/README.md#manifest-file-to-control-the-buildtest-apps
 
+.i2c_dependencies: &i2c_dependencies
+  depends_filepatterns:
+    # components
+    - examples/system/console/advanced/components/**/*
+    - components/driver/i2c/**/*
+    - components/driver/Kconfig
+
 examples/peripherals/adc/continuous_read:
   disable:
     - if: SOC_ADC_DMA_SUPPORTED != 1
@@ -24,11 +31,13 @@ examples/peripherals/i2c/i2c_self_test:
   disable:
     - if: SOC_I2C_SUPPORT_SLAVE != 1
       reason: the test requires both master and slave
+  <<: *i2c_dependencies
 
 examples/peripherals/i2c/i2c_simple:
   disable:
     - if: SOC_I2C_SUPPORT_SLAVE != 1
       reason: the test requires both master and slave
+  <<: *i2c_dependencies
 
 examples/peripherals/i2c/i2c_tools:
   disable:
@@ -37,10 +46,7 @@ examples/peripherals/i2c/i2c_tools:
     - if: IDF_TARGET != "esp32"
       temporary: true
       reason: lack of runners
-
-examples/peripherals/i2s/i2s_adc_dac:
-  disable:
-    - if: SOC_I2S_SUPPORTS_ADC_DAC != 1
+  <<: *i2c_dependencies
 
 examples/peripherals/i2s/i2s_basic/i2s_pdm:
   disable:
@@ -116,6 +122,13 @@ examples/peripherals/mcpwm/mcpwm_bldc_hall_control:
       temporary: true
       reason: lack of runners
 
+examples/peripherals/mcpwm/mcpwm_foc_svpwm_open_loop:
+  disable:
+    - if: SOC_MCPWM_SUPPORTED != 1
+    - if: IDF_TARGET == "esp32p4"
+      temporary: true
+      reason: not supported on p4 yet # TODO: IDF-8075
+
 examples/peripherals/parlio:
   disable:
     - if: SOC_PARLIO_SUPPORTED != 1
@@ -147,10 +160,6 @@ examples/peripherals/rmt/ir_nec_transceiver:
 examples/peripherals/rmt/musical_buzzer:
   disable:
     - if: SOC_RMT_SUPPORT_TX_LOOP_COUNT != 1
-
-examples/peripherals/rmt/onewire_ds18b20:
-  disable:
-    - if: SOC_RMT_SUPPORTED != 1
 
 examples/peripherals/rmt/stepper_motor:
   disable:
@@ -203,9 +212,9 @@ examples/peripherals/spi_slave/sender:
 
 examples/peripherals/spi_slave_hd/append_mode/master:
   disable:
-    - if: IDF_TARGET == "esp32c6"
+    - if: IDF_TARGET in ["esp32c6", "esp32p4"]
       temporary: true
-      reason: target(s) not supported yet
+      reason: target(s) not supported yet # TODO: IDF-7505
 
 examples/peripherals/spi_slave_hd/append_mode/slave:
   enable:
@@ -219,9 +228,7 @@ examples/peripherals/spi_slave_hd/segment_mode/seg_master:
 
 examples/peripherals/spi_slave_hd/segment_mode/seg_slave:
   disable:
-    - if: IDF_TARGET == "esp32"
-      temporary: true
-      reason: not supported
+    - if: IDF_TARGET == "esp32" or SOC_GPSPI_SUPPORTED != 1
 
 examples/peripherals/temperature_sensor/temp_sensor:
   disable:
@@ -287,9 +294,3 @@ examples/peripherals/uart/uart_echo_rs485:
 examples/peripherals/usb:
   disable:
     - if: SOC_USB_PERIPH_NUM != 1
-
-examples/peripherals/wave_gen:
-  enable:
-    - if: IDF_TARGET == "esp32"
-      temporary: true
-      reason: the other targets are not tested yet

@@ -1323,12 +1323,12 @@ tcp_receive(struct tcp_pcb *pcb)
       }
 #endif /* TCP_OVERSIZE */
 
-#if LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS
+#if LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS && LWIP_ND6
       if (ip_current_is_v6()) {
         /* Inform neighbor reachability of forward progress. */
         nd6_reachability_hint(ip6_current_src_addr());
       }
-#endif /* LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS*/
+#endif /* LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS && LWIP_ND6 */
 
       pcb->snd_buf = (tcpwnd_size_t)(pcb->snd_buf + recv_acked);
       /* check if this ACK ends our retransmission of in-flight data */
@@ -1598,7 +1598,7 @@ tcp_receive(struct tcp_pcb *pcb)
           if (pcb->rcv_wnd < TCP_TCPLEN(cseg)) {
             LWIP_DEBUGF(TCP_INPUT_DEBUG,
                       ("tcp_receive: OOSEQ packet out of wnd "
-                       "seqno=%"U32_F" wnd =%"U32_F" len=%"U16_F
+                       "seqno=%"U32_F" wnd =%"TCPWNDSIZE_F" len=%"U16_F
                        "snd_wl1=%"U32_F" snd_wl2 =%"U32_F" f = %"X16_F" tf=%"U16_F"\n",
                        seqno,pcb->rcv_wnd,cseg->len,pcb->snd_wl1,pcb->snd_wl1,
                        TCPH_FLAGS((cseg)->tcphdr),pcb->flags));
@@ -1670,12 +1670,12 @@ tcp_receive(struct tcp_pcb *pcb)
         }
 #endif /* LWIP_TCP_SACK_OUT */
 
-#if LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS
+#if LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS && LWIP_ND6
         if (ip_current_is_v6()) {
           /* Inform neighbor reachability of forward progress. */
           nd6_reachability_hint(ip6_current_src_addr());
         }
-#endif /* LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS*/
+#endif /* LWIP_IPV6 && LWIP_ND6_TCP_REACHABILITY_HINTS && LWIP_ND6*/
 
       } else {
         /* We get here if the incoming segment is out-of-sequence. */
@@ -1819,7 +1819,7 @@ tcp_receive(struct tcp_pcb *pcb)
                     if (TCPH_FLAGS(next->next->tcphdr) & TCP_SYN) {
                       LWIP_DEBUGF(TCP_INPUT_DEBUG,
                                   ("tcp_receive: ooseq not trimmed correctly to rcv_wnd "
-                                  "seqno=%"U32_F" wnd =%"U32_F" len=%"U16_F
+                                  "seqno=%"U32_F" wnd =%"TCPWNDSIZE_F" len=%"U16_F
                                   "snd_wl1=%"U32_F" snd_wl2 =%"U32_F" f = %"X16_F" tf=%"U16_F"\n",
                                    seqno,pcb->rcv_wnd,next->next->len,pcb->snd_wl1,pcb->snd_wl1,
                                    TCPH_FLAGS(next->next->tcphdr),pcb->flags));

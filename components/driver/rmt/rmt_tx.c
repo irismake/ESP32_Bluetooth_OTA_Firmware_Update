@@ -61,7 +61,9 @@ static esp_err_t rmt_tx_init_dma_link(rmt_tx_channel_t *tx_channel, const rmt_tx
     gdma_channel_alloc_config_t dma_chan_config = {
         .direction = GDMA_CHANNEL_DIRECTION_TX,
     };
-    ESP_RETURN_ON_ERROR(gdma_new_channel(&dma_chan_config, &tx_channel->base.dma_chan), TAG, "allocate TX DMA channel failed");
+#if SOC_GDMA_TRIG_PERIPH_RMT0_BUS == SOC_GDMA_BUS_AHB
+    ESP_RETURN_ON_ERROR(gdma_new_ahb_channel(&dma_chan_config, &tx_channel->base.dma_chan), TAG, "allocate TX DMA channel failed");
+#endif
     gdma_strategy_config_t gdma_strategy_conf = {
         .auto_update_desc = true,
         .owner_check = true,
@@ -120,7 +122,6 @@ static esp_err_t rmt_tx_register_to_group(rmt_tx_channel_t *tx_channel, const rm
         if (channel_id < 0) {
             // didn't find a capable channel in the group, don't forget to release the group handle
             rmt_release_group_handle(group);
-            group = NULL;
         } else {
             tx_channel->base.channel_id = channel_id;
             tx_channel->base.channel_mask = channel_mask;
@@ -144,26 +145,33 @@ static void rmt_tx_unregister_from_group(rmt_channel_t *channel, rmt_group_t *gr
 
 static esp_err_t rmt_tx_create_trans_queue(rmt_tx_channel_t *tx_channel, const rmt_tx_channel_config_t *config)
 {
+    esp_err_t ret;
+
     tx_channel->queue_size = config->trans_queue_depth;
-    // the queue only saves transaction description pointers
-    tx_channel->queues_storage = heap_caps_calloc(config->trans_queue_depth * RMT_TX_QUEUE_MAX, sizeof(rmt_tx_trans_desc_t *), RMT_MEM_ALLOC_CAPS);
-    ESP_RETURN_ON_FALSE(tx_channel->queues_storage, ESP_ERR_NO_MEM, TAG, "no mem for queue storage");
-    rmt_tx_trans_desc_t **pp_trans_desc = (rmt_tx_trans_desc_t **)tx_channel->queues_storage;
+    // Allocate transaction queues. Each queue only holds pointers to the transaction descriptors
     for (int i = 0; i < RMT_TX_QUEUE_MAX; i++) {
-        tx_channel->trans_queues[i] = xQueueCreateStatic(config->trans_queue_depth, sizeof(rmt_tx_trans_desc_t *),
-                                      (uint8_t *)pp_trans_desc, &tx_channel->trans_queue_structs[i]);
-        pp_trans_desc += config->trans_queue_depth;
-        // sanity check
-        assert(tx_channel->trans_queues[i]);
+        tx_channel->trans_queues[i] = xQueueCreateWithCaps(config->trans_queue_depth, sizeof(rmt_tx_trans_desc_t *), RMT_MEM_ALLOC_CAPS);
+        ESP_GOTO_ON_FALSE(tx_channel->trans_queues[i], ESP_ERR_NO_MEM, exit, TAG, "no mem for queues");
     }
-    // initialize the ready queue
+
+    // Initialize the ready queue
     rmt_tx_trans_desc_t *p_trans_desc = NULL;
     for (int i = 0; i < config->trans_queue_depth; i++) {
         p_trans_desc = &tx_channel->trans_desc_pool[i];
-        ESP_RETURN_ON_FALSE(xQueueSend(tx_channel->trans_queues[RMT_TX_QUEUE_READY], &p_trans_desc, 0) == pdTRUE,
-                            ESP_ERR_INVALID_STATE, TAG, "ready queue full");
+        ESP_GOTO_ON_FALSE(xQueueSend(tx_channel->trans_queues[RMT_TX_QUEUE_READY], &p_trans_desc, 0) == pdTRUE,
+                          ESP_ERR_INVALID_STATE, exit, TAG, "ready queue full");
     }
+
     return ESP_OK;
+
+exit:
+    for (int i = 0; i < RMT_TX_QUEUE_MAX; i++) {
+        if (tx_channel->trans_queues[i]) {
+            vQueueDeleteWithCaps(tx_channel->trans_queues[i]);
+            tx_channel->trans_queues[i] = NULL;
+        }
+    }
+    return ret;
 }
 
 static esp_err_t rmt_tx_destroy(rmt_tx_channel_t *tx_channel)
@@ -181,11 +189,8 @@ static esp_err_t rmt_tx_destroy(rmt_tx_channel_t *tx_channel)
 #endif // SOC_RMT_SUPPORT_DMA
     for (int i = 0; i < RMT_TX_QUEUE_MAX; i++) {
         if (tx_channel->trans_queues[i]) {
-            vQueueDelete(tx_channel->trans_queues[i]);
+            vQueueDeleteWithCaps(tx_channel->trans_queues[i]);
         }
-    }
-    if (tx_channel->queues_storage) {
-        free(tx_channel->queues_storage);
     }
     if (tx_channel->base.dma_mem_base) {
         free(tx_channel->base.dma_mem_base);
@@ -205,10 +210,16 @@ esp_err_t rmt_new_tx_channel(const rmt_tx_channel_config_t *config, rmt_channel_
 #endif
     esp_err_t ret = ESP_OK;
     rmt_tx_channel_t *tx_channel = NULL;
+    // Check if priority is valid
+    if (config->intr_priority) {
+        ESP_RETURN_ON_FALSE((config->intr_priority) > 0, ESP_ERR_INVALID_ARG, TAG, "invalid interrupt priority:%d", config->intr_priority);
+        ESP_RETURN_ON_FALSE(1 << (config->intr_priority) & RMT_ALLOW_INTR_PRIORITY_MASK, ESP_ERR_INVALID_ARG, TAG, "invalid interrupt priority:%d", config->intr_priority);
+    }
     ESP_GOTO_ON_FALSE(config && ret_chan && config->resolution_hz && config->trans_queue_depth, ESP_ERR_INVALID_ARG, err, TAG, "invalid argument");
     ESP_GOTO_ON_FALSE(GPIO_IS_VALID_GPIO(config->gpio_num), ESP_ERR_INVALID_ARG, err, TAG, "invalid GPIO number");
     ESP_GOTO_ON_FALSE((config->mem_block_symbols & 0x01) == 0 && config->mem_block_symbols >= SOC_RMT_MEM_WORDS_PER_CHANNEL,
                       ESP_ERR_INVALID_ARG, err, TAG, "mem_block_symbols must be even and at least %d", SOC_RMT_MEM_WORDS_PER_CHANNEL);
+
 #if SOC_RMT_SUPPORT_DMA
     // we only support 2 nodes ping-pong, if the configured memory block size needs more than two DMA descriptors, should treat it as invalid
     ESP_GOTO_ON_FALSE(config->mem_block_symbols <= RMT_DMA_DESC_BUF_MAX_SIZE * RMT_DMA_NODES_PING_PONG / sizeof(rmt_symbol_word_t),
@@ -241,13 +252,19 @@ esp_err_t rmt_new_tx_channel(const rmt_tx_channel_config_t *config, rmt_channel_
     portENTER_CRITICAL(&group->spinlock);
     rmt_hal_tx_channel_reset(&group->hal, channel_id);
     portEXIT_CRITICAL(&group->spinlock);
-
-    // install interrupt service
+    // install tx interrupt
+    // --- install interrupt service
     // interrupt is mandatory to run basic RMT transactions, so it's not lazy installed in `rmt_tx_register_event_callbacks()`
-    int isr_flags = RMT_INTR_ALLOC_FLAG;
+    // 1-- Set user specified priority to `group->intr_priority`
+    bool priority_conflict = rmt_set_intr_priority_to_group(group, config->intr_priority);
+    ESP_GOTO_ON_FALSE(!priority_conflict, ESP_ERR_INVALID_ARG, err, TAG, "intr_priority conflict");
+    // 2-- Get interrupt allocation flag
+    int isr_flags = rmt_get_isr_flags(group);
+    // 3-- Allocate interrupt using isr_flag
     ret = esp_intr_alloc_intrstatus(rmt_periph_signals.groups[group_id].irq, isr_flags,
-                                    (uint32_t)rmt_ll_get_interrupt_status_reg(hal->regs),
-                                    RMT_LL_EVENT_TX_MASK(channel_id), rmt_tx_default_isr, tx_channel, &tx_channel->base.intr);
+                                    (uint32_t) rmt_ll_get_interrupt_status_reg(hal->regs),
+                                    RMT_LL_EVENT_TX_MASK(channel_id), rmt_tx_default_isr, tx_channel,
+                                    &tx_channel->base.intr);
     ESP_GOTO_ON_ERROR(ret, err, TAG, "install tx interrupt failed");
     // install DMA service
 #if SOC_RMT_SUPPORT_DMA
@@ -278,7 +295,7 @@ esp_err_t rmt_new_tx_channel(const rmt_tx_channel_config_t *config, rmt_channel_
     tx_channel->base.gpio_num = config->gpio_num;
     gpio_config_t gpio_conf = {
         .intr_type = GPIO_INTR_DISABLE,
-        // also enable the input path is `io_loop_back` is on, this is useful for bi-directional buses
+        // also enable the input path if `io_loop_back` is on, this is useful for bi-directional buses
         .mode = (config->flags.io_od_mode ? GPIO_MODE_OUTPUT_OD : GPIO_MODE_OUTPUT) | (config->flags.io_loop_back ? GPIO_MODE_INPUT : 0),
         .pull_down_en = false,
         .pull_up_en = true,
@@ -378,7 +395,6 @@ esp_err_t rmt_new_sync_manager(const rmt_sync_manager_config_t *config, rmt_sync
         rmt_ll_tx_reset_pointer(group->hal.regs, config->tx_channel_array[i]->channel_id);
     }
     portEXIT_CRITICAL(&group->spinlock);
-
 
     *ret_synchro = synchro;
     ESP_LOGD(TAG, "new sync manager at %p, with channel mask:%02"PRIx32, synchro, synchro->channel_mask);

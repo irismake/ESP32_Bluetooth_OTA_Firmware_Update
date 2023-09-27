@@ -39,6 +39,8 @@
 #include "esp32h2/rom/cache.h"
 #include "soc/extmem_reg.h"
 #include "soc/ext_mem_defs.h"
+#elif CONFIG_IDF_TARGET_ESP32P4
+#include "esp32p4/rom/cache.h"
 #endif
 #include "esp_rom_spiflash.h"
 #include "hal/cache_hal.h"
@@ -356,11 +358,6 @@ void IRAM_ATTR spi_flash_enable_cache(uint32_t cpuid)
 #endif
 }
 
-/**
- * The following two functions are replacements for Cache_Read_Disable and Cache_Read_Enable
- * function in ROM. They are used to work around a bug where Cache_Read_Disable requires a call to
- * Cache_Flush before Cache_Read_Enable, even if cached data was not modified.
- */
 void IRAM_ATTR spi_flash_disable_cache(uint32_t cpuid, uint32_t *saved_state)
 {
     cache_hal_suspend(CACHE_TYPE_ALL);
@@ -485,7 +482,7 @@ esp_err_t esp_enable_cache_wrap(bool icache_wrap_enable, bool dcache_wrap_enable
     int i;
     bool flash_spiram_wrap_together, flash_support_wrap = true, spiram_support_wrap = true;
     uint32_t drom0_in_icache = 1;//always 1 in esp32s2
-#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C2 || CONFIG_IDF_TARGET_ESP32C6
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C2 || CONFIG_IDF_TARGET_ESP32C6 || CONFIG_IDF_TARGET_ESP32P4
     drom0_in_icache = 0;
 #endif
 
@@ -914,3 +911,28 @@ esp_err_t esp_enable_cache_wrap(bool icache_wrap_enable)
     return ESP_OK;
 }
 #endif // CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C2
+
+#if CONFIG_IDF_TARGET_ESP32P4
+//TODO: IDF-5670
+void esp_config_l2_cache_mode(void)
+{
+    cache_size_t cache_size;
+    cache_line_size_t cache_line_size;
+#if CONFIG_ESP32P4_L2_CACHE_128KB
+    cache_size = CACHE_SIZE_128K;
+#elif CONFIG_ESP32P4_L2_CACHE_256KB
+    cache_size = CACHE_SIZE_256K;
+#else
+    cache_size = CACHE_SIZE_512K;
+#endif
+
+#if CONFIG_ESP32P4_L2_CACHE_LINE_64B
+    cache_line_size = CACHE_LINE_SIZE_64B;
+#else
+    cache_line_size = CACHE_LINE_SIZE_128B;
+#endif
+
+    Cache_Set_L2_Cache_Mode(cache_size, 8, cache_line_size);
+    Cache_Invalidate_All(CACHE_MAP_L2_CACHE);
+}
+#endif

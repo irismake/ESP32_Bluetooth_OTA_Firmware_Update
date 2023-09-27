@@ -805,6 +805,7 @@ static inline __attribute__((always_inline)) uint32_t clk_ll_rtc_slow_load_cal(v
     return REG_READ(RTC_SLOW_CLK_CAL_REG);
 }
 
+
 /*
 Set the frequency division factor of ref_tick
 */
@@ -812,6 +813,7 @@ static inline void clk_ll_rc_fast_tick_conf(void)
 {
     PCR.ctrl_tick_conf.fosc_tick_num = REG_FOSC_TICK_NUM;
 }
+
 
 #ifdef __cplusplus
 }

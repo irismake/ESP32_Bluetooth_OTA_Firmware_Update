@@ -281,7 +281,7 @@ static inline void i2s_ll_tx_set_bck_div_num(i2s_dev_t *hw, uint32_t val)
 
 /**
  * @brief Configure I2S module clock divider
- * @note mclk on ESP32S2 is shared by both TX and RX channel
+ * @note mclk on ESP32 is shared by both TX and RX channel
  *       mclk = sclk / (mclk_div + b/a)
  *
  * @param hw Peripheral I2S hardware instance address.

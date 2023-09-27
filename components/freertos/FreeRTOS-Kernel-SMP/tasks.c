@@ -40,9 +40,11 @@
 #include "stack_macros.h"
 
 #ifdef ESP_PLATFORM
+#if ( configUSE_NEWLIB_REENTRANT == 1 )
 #include "esp_newlib.h"             /* required for esp_reent_init() in tasks.c */
 #undef _REENT_INIT_PTR
 #define _REENT_INIT_PTR                 esp_reent_init
+#endif
 #endif
 
 /* Lint e9021, e961 and e750 are suppressed as a MISRA exception justified
@@ -6504,14 +6506,3 @@ static void prvAddCurrentTaskToDelayedList( TickType_t xTicksToWait,
     #endif
 
 #endif /* if ( configINCLUDE_FREERTOS_TASK_C_ADDITIONS_H == 1 ) */
-
-#if ( ( ESP_PLATFORM == 1 ) && ( configNUM_CORES > 1 ) )
-/*
-Workaround for non-thread safe multi-core OS startup (see IDF-4524)
-*/
-void vTaskStartSchedulerOtherCores( void )
-{
-    /* This function is always called with interrupts disabled*/
-    xSchedulerRunning = pdTRUE;
-}
-#endif // ( ESP_PLATFORM == 1 ) && ( configNUM_CORES > 1

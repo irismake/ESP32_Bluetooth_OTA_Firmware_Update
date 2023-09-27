@@ -152,7 +152,7 @@ static void ble_hci_rx_acl(uint8_t *data, uint16_t len)
         m = ble_transport_alloc_acl_from_ll();
 
         if (!m) {
-            ESP_LOGD(TAG,"Failed to allocate buffer, retrying \n");
+            ESP_LOGD(TAG,"Failed to allocate buffer, retrying ");
 	    /* Give some time to free buffer and try again */
 	    vTaskDelay(1);
 	}
@@ -265,6 +265,10 @@ esp_err_t esp_nimble_hci_init(void)
 
     xSemaphoreGive(vhci_send_sem);
 
+#if MYNEWT_VAL(BLE_QUEUE_CONG_CHECK)
+    ble_adv_list_init();
+#endif
+
     return ret;
 err:
     ble_buf_free();
@@ -285,6 +289,10 @@ esp_err_t esp_nimble_hci_deinit(void)
     ble_transport_deinit();
 
     ble_buf_free();
+
+#if MYNEWT_VAL(BLE_QUEUE_CONG_CHECK)
+    ble_adv_list_deinit();
+#endif
 
     return ESP_OK;
 }

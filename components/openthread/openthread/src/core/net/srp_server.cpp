@@ -308,7 +308,7 @@ const Server::Host *Server::GetNextHost(const Server::Host *aHost)
     return (aHost == nullptr) ? mHosts.GetHead() : aHost->GetNext();
 }
 
-void Server::RemoveHost(Host *aHost, RetainName aRetainName, NotifyMode aNotifyServiceHandler)
+void Server::RemoveHost(Host *aHost, RetainName aRetainName)
 {
     VerifyOrExit(aHost != nullptr);
 
@@ -326,7 +326,7 @@ void Server::RemoveHost(Host *aHost, RetainName aRetainName, NotifyMode aNotifyS
         LogInfo("Fully remove host %s", aHost->GetFullName());
     }
 
-    if (aNotifyServiceHandler && mServiceUpdateHandler.IsSet())
+    if (mServiceUpdateHandler.IsSet())
     {
         uint32_t updateId = AllocateId();
 
@@ -353,7 +353,7 @@ bool Server::HasNameConflictsWith(Host &aHost) const
     bool        hasConflicts = false;
     const Host *existingHost = mHosts.FindMatching(aHost.GetFullName());
 
-    if (existingHost != nullptr && aHost.GetKeyRecord()->GetKey() != existingHost->GetKeyRecord()->GetKey())
+    if ((existingHost != nullptr) && (aHost.mKey != existingHost->mKey))
     {
         LogWarn("Name conflict: host name %s has already been allocated", aHost.GetFullName());
         ExitNow(hasConflicts = true);
@@ -367,8 +367,7 @@ bool Server::HasNameConflictsWith(Host &aHost) const
 
         for (const Host &host : mHosts)
         {
-            if (host.HasService(service.GetInstanceName()) &&
-                aHost.GetKeyRecord()->GetKey() != host.GetKeyRecord()->GetKey())
+            if (host.HasService(service.GetInstanceName()) && (aHost.mKey != host.mKey))
             {
                 LogWarn("Name conflict: service name %s has already been allocated", service.GetInstanceName());
                 ExitNow(hasConflicts = true);
@@ -439,6 +438,7 @@ void Server::CommitSrpUpdate(Error                    aError,
     uint32_t hostKeyLease    = 0;
     uint32_t grantedLease    = 0;
     uint32_t grantedKeyLease = 0;
+    bool     useShortLease   = aHost.ShouldUseShortLeaseOption();
 
     if (aError != kErrorNone)
     {
@@ -449,7 +449,7 @@ void Server::CommitSrpUpdate(Error                    aError,
     hostLease       = aHost.GetLease();
     hostKeyLease    = aHost.GetKeyLease();
     grantedLease    = aLeaseConfig.GrantLease(hostLease);
-    grantedKeyLease = aHost.ShouldUseShortLeaseOption() ? grantedLease : aLeaseConfig.GrantKeyLease(hostKeyLease);
+    grantedKeyLease = useShortLease ? grantedLease : aLeaseConfig.GrantKeyLease(hostKeyLease);
     grantedTtl      = aTtlConfig.GrantTtl(grantedLease, aHost.GetTtl());
 
     existingHost = mHosts.RemoveMatching(aHost.GetFullName());
@@ -466,6 +466,7 @@ void Server::CommitSrpUpdate(Error                    aError,
     {
         VerifyOrExit(existingHost != nullptr);
         LogInfo("Fully remove host %s", aHost.GetFullName());
+        aHost.Free();
         ExitNow();
     }
 
@@ -538,7 +539,7 @@ exit:
     {
         if (aError == kErrorNone && !(grantedLease == hostLease && grantedKeyLease == hostKeyLease))
         {
-            SendResponse(aDnsHeader, grantedLease, grantedKeyLease, aHost.ShouldUseShortLeaseOption(), *aMessageInfo);
+            SendResponse(aDnsHeader, grantedLease, grantedKeyLease, useShortLease, *aMessageInfo);
         }
         else
         {
@@ -674,7 +675,7 @@ void Server::Stop(void)
 
     while (!mHosts.IsEmpty())
     {
-        RemoveHost(mHosts.GetHead(), kDeleteName, kNotifyServiceHandler);
+        RemoveHost(mHosts.GetHead(), kDeleteName);
     }
 
     // TODO: We should cancel any outstanding service updates, but current
@@ -894,8 +895,15 @@ Error Server::ProcessHostDescriptionInstruction(Host                  &aHost,
             SuccessOrExit(error = aMessage.Read(offset, keyRecord));
             VerifyOrExit(keyRecord.IsValid(), error = kErrorParse);
 
-            VerifyOrExit(aHost.GetKeyRecord() == nullptr || *aHost.GetKeyRecord() == keyRecord, error = kErrorSecurity);
-            aHost.SetKeyRecord(keyRecord);
+            if (aHost.mParsedKey)
+            {
+                VerifyOrExit(aHost.mKey == keyRecord.GetKey(), error = kErrorSecurity);
+            }
+            else
+            {
+                aHost.mParsedKey = true;
+                aHost.mKey       = keyRecord.GetKey();
+            }
         }
 
         offset += record.GetSize();
@@ -904,7 +912,7 @@ Error Server::ProcessHostDescriptionInstruction(Host                  &aHost,
     // Verify that we have a complete Host Description Instruction.
 
     VerifyOrExit(aHost.GetFullName() != nullptr, error = kErrorFailed);
-    VerifyOrExit(aHost.GetKeyRecord() != nullptr, error = kErrorFailed);
+    VerifyOrExit(aHost.mParsedKey, error = kErrorFailed);
 
     // We check the number of host addresses after processing of the
     // Lease Option in the Addition Section and determining whether
@@ -1219,8 +1227,8 @@ Error Server::ProcessAdditionalSection(Host *aHost, const Message &aMessage, Mes
     VerifyOrExit(sigRecord.GetTypeCovered() == 0, error = kErrorFailed);
     VerifyOrExit(signatureLength == Crypto::Ecdsa::P256::Signature::kSize, error = kErrorParse);
 
-    SuccessOrExit(error = VerifySignature(*aHost->GetKeyRecord(), aMessage, aMetadata.mDnsHeader, sigOffset,
-                                          sigRdataOffset, sigRecord.GetLength(), signerName));
+    SuccessOrExit(error = VerifySignature(aHost->mKey, aMessage, aMetadata.mDnsHeader, sigOffset, sigRdataOffset,
+                                          sigRecord.GetLength(), signerName));
 
     aMetadata.mOffset = offset;
 
@@ -1233,13 +1241,13 @@ exit:
     return error;
 }
 
-Error Server::VerifySignature(const Dns::Ecdsa256KeyRecord &aKeyRecord,
-                              const Message                &aMessage,
-                              Dns::UpdateHeader             aDnsHeader,
-                              uint16_t                      aSigOffset,
-                              uint16_t                      aSigRdataOffset,
-                              uint16_t                      aSigRdataLength,
-                              const char                   *aSignerName) const
+Error Server::VerifySignature(const Host::Key  &aKey,
+                              const Message    &aMessage,
+                              Dns::UpdateHeader aDnsHeader,
+                              uint16_t          aSigOffset,
+                              uint16_t          aSigRdataOffset,
+                              uint16_t          aSigRdataLength,
+                              const char       *aSignerName) const
 {
     Error                          error;
     uint16_t                       offset = aMessage.GetOffset();
@@ -1273,7 +1281,7 @@ Error Server::VerifySignature(const Dns::Ecdsa256KeyRecord &aKeyRecord,
     signatureOffset = aSigRdataOffset + aSigRdataLength - Crypto::Ecdsa::P256::Signature::kSize;
     SuccessOrExit(error = aMessage.Read(signatureOffset, signature));
 
-    error = aKeyRecord.GetKey().Verify(hash, signature);
+    error = aKey.Verify(hash, signature);
 
 exit:
     if (error != kErrorNone)
@@ -1554,7 +1562,7 @@ void Server::HandleLeaseTimer(void)
             LogInfo("KEY LEASE of host %s expired", host->GetFullName());
 
             // Removes the whole host and all services if the KEY RR expired.
-            RemoveHost(host, kDeleteName, kNotifyServiceHandler);
+            RemoveHost(host, kDeleteName);
         }
         else if (host->IsDeleted())
         {
@@ -1593,7 +1601,7 @@ void Server::HandleLeaseTimer(void)
                 host->RemoveService(&service, kRetainName, kDoNotNotifyServiceHandler);
             }
 
-            RemoveHost(host, kRetainName, kNotifyServiceHandler);
+            RemoveHost(host, kRetainName);
 
             earliestExpireTime = Min(earliestExpireTime, host->GetKeyExpireTime());
         }
@@ -1894,8 +1902,9 @@ Server::Host::Host(Instance &aInstance, TimeMilli aUpdateTime)
     , mLease(0)
     , mKeyLease(0)
     , mUpdateTime(aUpdateTime)
+    , mParsedKey(false)
+    , mUseShortLeaseOption(false)
 {
-    mKeyRecord.Clear();
 }
 
 Server::Host::~Host(void) { FreeAllServices(); }
@@ -1923,13 +1932,6 @@ Error Server::Host::SetFullName(const char *aFullName)
 bool Server::Host::Matches(const char *aFullName) const
 {
     return StringMatch(mFullName.AsCString(), aFullName, kStringCaseInsensitiveMatch);
-}
-
-void Server::Host::SetKeyRecord(Dns::Ecdsa256KeyRecord &aKeyRecord)
-{
-    OT_ASSERT(aKeyRecord.IsValid());
-
-    mKeyRecord = aKeyRecord;
 }
 
 TimeMilli Server::Host::GetExpireTime(void) const

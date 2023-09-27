@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -12,10 +12,13 @@
 #include "sdkconfig.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_rom_caps.h"
 #include "hal/mmu_ll.h"
 #include "hal/mmu_hal.h"
 #include "hal/cache_hal.h"
+#if ESP_ROM_NEEDS_SET_CACHE_MMU_SIZE
 #include "soc/mmu.h"
+#endif
 
 #include "esp_private/esp_mmu_map_private.h"
 #include "esp_mmu_map.h"
@@ -27,6 +30,9 @@
 
 #if CONFIG_IDF_TARGET_ESP32
 #include "esp_private/esp_cache_esp32_private.h"
+#elif CONFIG_IDF_TARGET_ESP32P4
+//TODO: IDF-7516
+#include "esp32p4/rom/cache.h"
 #endif
 
 #include "esp_private/cache_utils.h"
@@ -371,7 +377,12 @@ IRAM_ATTR bool spi_flash_check_and_flush_cache(size_t start_addr, size_t length)
             return true;
 #else // CONFIG_IDF_TARGET_ESP32
             if (vaddr != NULL) {
+#if CONFIG_IDF_TARGET_ESP32P4
+                //TODO: IDF-7516
+                Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | CACHE_MAP_L2_CACHE, (uint32_t)vaddr, SPI_FLASH_MMU_PAGE_SIZE);
+#else
                 cache_hal_invalidate_addr((uint32_t)vaddr, SPI_FLASH_MMU_PAGE_SIZE);
+#endif
                 ret = true;
             }
 #endif // CONFIG_IDF_TARGET_ESP32

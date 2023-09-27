@@ -28,7 +28,7 @@
 #include "soc/systimer_reg.h"
 #endif
 
-static const DRAM_ATTR rtc_sleep_pu_config_t pu_cfg = RTC_SLEEP_PU_CONFIG_ALL(1);
+static const DRAM_ATTR  rtc_sleep_pu_config_t pu_cfg = RTC_SLEEP_PU_CONFIG_ALL(1);
 
 /**
  * Configure whether certain peripherals are powered down in deep sleep

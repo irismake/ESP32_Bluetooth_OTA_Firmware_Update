@@ -832,8 +832,15 @@ class OpenThreadTHCI(object):
             [str]: The modified string with escaped characters.
         """
         escapable_chars = '\\ \t\r\n'
+        escapable_chars_present = False
+
         for char in escapable_chars:
-            string = string.replace(char, '\\%s' % char)
+            if char in string:
+                string = string.replace(char, '\\%s' % char)
+                escapable_chars_present = True
+
+        if self._cmdPrefix == ZEPHYR_PREFIX and escapable_chars_present:
+            string = '"' + string + '"'
         return string
 
     @API
@@ -2338,15 +2345,16 @@ class OpenThreadTHCI(object):
                     EncryptedPacket.TLVsLength = int(infoValue)
                     payloadLineCount = (int(infoValue) + bytesInEachLine - 1) / bytesInEachLine
                     while payloadLineCount > 0:
-                        payloadLineCount = payloadLineCount - 1
                         payloadLine = rawLogs.get()
-                        payloadSplit = payloadLine.split('|')
-                        for block in range(1, 3):
-                            payloadBlock = payloadSplit[block]
-                            payloadValues = payloadBlock.split(' ')
-                            for num in range(1, 9):
-                                if '..' not in payloadValues[num]:
-                                    payload.append(int(payloadValues[num], 16))
+                        if '|' in payloadLine:
+                            payloadLineCount = payloadLineCount - 1
+                            payloadSplit = payloadLine.split('|')
+                            for block in range(1, 3):
+                                payloadBlock = payloadSplit[block]
+                                payloadValues = payloadBlock.split(' ')
+                                for num in range(1, 9):
+                                    if '..' not in payloadValues[num]:
+                                        payload.append(int(payloadValues[num], 16))
 
                     EncryptedPacket.TLVs = (PlatformPackets.read(EncryptedPacket.Type, payload)
                                             if payload != [] else [])
@@ -2923,11 +2931,8 @@ class OpenThreadTHCI(object):
         Args:
             period: csl period in ms
 
-        note: OT command 'csl period' accepts parameter in unit of 10 symbols,
-        period is converted from unit ms to ten symbols (160us per 10 symbols).
-
         """
-        cmd = 'csl period %u' % (period * 6.25)
+        cmd = 'csl period %u' % (period * 1000)
         return self.__executeCommand(cmd)[-1] == 'Done'
 
     @staticmethod

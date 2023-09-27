@@ -6,7 +6,7 @@ ESP-IDF is the development framework for Espressif SoCs supported on Windows, Li
 
 # ESP-IDF Release Support Schedule
 
-![Support Schedule](https://dl.espressif.com/dl/esp-idf/support-periods.svg)
+![Support Schedule](https://dl.espressif.com/dl/esp-idf/support-periods.svg?v=1)
 
 - Please read [the support policy](SUPPORT_POLICY.md) and [the documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/versions.html) for more information about ESP-IDF versions.
 - Please see the [End-of-Life Advisories](https://www.espressif.com/en/support/documents/advisories?keys=&field_type_of_advisory_tid%5B%5D=817) for information about ESP-IDF releases with discontinued support.
@@ -27,6 +27,8 @@ The following table shows ESP-IDF support of Espressif SoCs where ![alt text][pr
 
 [supported]: https://img.shields.io/badge/-supported-green "supported"
 [preview]: https://img.shields.io/badge/-preview-orange "preview"
+
+There are variants of revisions for a series of chips. See [Compatibility Between ESP-IDF Releases and Revisions of Espressif SoCs](https://github.com/espressif/esp-idf/blob/master/COMPATIBILITY.md) for the details of the compatibility between ESP-IDF and chip revisions.
 
 Espressif SoCs released before 2016 (ESP8266 and ESP8285) are supported by [RTOS SDK](https://github.com/espressif/ESP8266_RTOS_SDK) instead.
 
@@ -123,5 +125,3 @@ This can be combined with other targets, ie `idf.py -p PORT erase-flash flash` w
 * [Check the Issues section on github](https://github.com/espressif/esp-idf/issues) if you find a bug or have a feature request. Please check existing Issues before opening a new one.
 
 * If you're interested in contributing to ESP-IDF, please check the [Contributions Guide](https://docs.espressif.com/projects/esp-idf/en/latest/contribute/index.html).
-#   E S P 3 2 _ B l u e t o o t h _ O T A _ F i r m w a r e _ U p d a t e  
- 

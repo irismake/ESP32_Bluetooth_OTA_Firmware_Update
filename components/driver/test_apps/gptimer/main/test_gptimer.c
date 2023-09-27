@@ -90,7 +90,7 @@ TEST_CASE("gptimer_wallclock_with_various_clock_sources", "[gptimer]")
             TEST_ESP_OK(gptimer_get_raw_count(timers[i], &value));
             // convert the raw count to us
             value = value * 1000000 / timer_resolution_hz[i];
-            TEST_ASSERT_UINT_WITHIN(300, 20000, value);
+            TEST_ASSERT_UINT_WITHIN(200, 20000, value);
         }
         printf("stop timers\r\n");
         for (int i = 0; i < SOC_TIMER_GROUP_TOTAL_TIMERS; i++) {
@@ -103,7 +103,7 @@ TEST_CASE("gptimer_wallclock_with_various_clock_sources", "[gptimer]")
             printf("get raw count of gptimer %d: %llu\r\n", i, value);
             // convert the raw count to us
             value = value * 1000000 / timer_resolution_hz[i];
-            TEST_ASSERT_UINT_WITHIN(300, 20000, value);
+            TEST_ASSERT_UINT_WITHIN(200, 20000, value);
         }
         printf("restart timers\r\n");
         for (int i = 0; i < SOC_TIMER_GROUP_TOTAL_TIMERS; i++) {
@@ -121,7 +121,7 @@ TEST_CASE("gptimer_wallclock_with_various_clock_sources", "[gptimer]")
             printf("get raw count of gptimer %d: %llu\r\n", i, value);
             // convert the raw count to us
             value = value * 1000000 / timer_resolution_hz[i];
-            TEST_ASSERT_UINT_WITHIN(600, 40000, value);
+            TEST_ASSERT_UINT_WITHIN(400, 40000, value);
         }
         printf("disable timers\r\n");
         for (int i = 0; i < SOC_TIMER_GROUP_TOTAL_TIMERS; i++) {
@@ -141,7 +141,7 @@ TEST_CASE("gptimer_wallclock_with_various_clock_sources", "[gptimer]")
 #if CONFIG_PM_ENABLE
 #define GPTIMER_STOP_ON_ALARM_COUNT_DELTA  150
 #else
-#define GPTIMER_STOP_ON_ALARM_COUNT_DELTA  30
+#define GPTIMER_STOP_ON_ALARM_COUNT_DELTA  40
 #endif // CONFIG_PM_ENABLE
 
 TEST_ALARM_CALLBACK_ATTR static bool test_gptimer_alarm_stop_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_data)
@@ -283,7 +283,6 @@ TEST_CASE("gptimer_auto_reload_on_alarm", "[gptimer]")
     }
 }
 
-
 TEST_ALARM_CALLBACK_ATTR static bool test_gptimer_alarm_normal_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_data)
 {
     TaskHandle_t task_handle = (TaskHandle_t)user_data;
@@ -316,6 +315,7 @@ TEST_CASE("gptimer_one_shot_alarm", "[gptimer]")
     };
     gptimer_handle_t timers[SOC_TIMER_GROUP_TOTAL_TIMERS];
     for (int i = 0; i < SOC_TIMER_GROUP_TOTAL_TIMERS; i++) {
+        timer_config.intr_priority = i % 3 + 1; // test different priorities
         TEST_ESP_OK(gptimer_new_timer(&timer_config, &timers[i]));
     }
 

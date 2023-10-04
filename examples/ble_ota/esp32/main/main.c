@@ -25,6 +25,11 @@ bool run_diagnostics() {
     }
 }*/
 
+void back_to_ota()
+{
+    
+}
+
 void app_main(void) {
     // check which partition is running
     const esp_partition_t* partition = esp_ota_get_running_partition();
@@ -105,5 +110,6 @@ void app_main(void) {
     ble_svc_gap_device_name_set(device_name);
     nimble_port_freertos_init(host_task);
 
-   
+    
+
 }

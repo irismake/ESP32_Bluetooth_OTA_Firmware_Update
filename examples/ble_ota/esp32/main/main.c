@@ -15,20 +15,6 @@ bool run_diagnostics() {
     return true;
 }
 
-/*void eraseLastBootAppPartition() {
-    esp_err_t err = esp_ota_erase_last_boot_app_partition();
-    if (err == ESP_OK) {
-        ESP_LOGI(LOG_TAG_MAIN, "Erased the last boot app partition successfully.");
-    }
-    else {
-        ESP_LOGE(LOG_TAG_MAIN, "Failed to erase the last boot app partition. Error code: 0x%X", err);
-    }
-}*/
-
-void back_to_ota()
-{
-    
-}
 
 void app_main(void) {
     // check which partition is running

@@ -212,22 +212,11 @@ static void update_ota_control(uint16_t conn_handle) {
         // err  == esp_ota_set_boot_partition(update_partition);
         if (err == ESP_OK) {
             ESP_LOGI(LOG_TAG_GATT_SVR, "Preparing to restart!");
-            // vTaskDelay(pdMS_TO_TICKS(REBOOT_DEEP_SLEEP_TIMEOUT));
-            // esp_restart();
-           // const esp_partition_t* next_partition = esp_ota_get_next_update_partition(NULL);
+      
             const esp_partition_t* configured = esp_ota_get_boot_partition();
             const esp_partition_t* running = esp_ota_get_running_partition();
 
-
-            /*if (configured != running) {
-                ESP_LOGE(LOG_TAG_GATT_SVR, "Configured OTA boot partition at offset 0x%lX, but running from offset 0x%lX",
-                    configured->address, running->address);
-
-                ESP_LOGI(LOG_TAG_GATT_SVR, "(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)");
-            }
-           
-            ESP_LOGE(LOG_TAG_GATT_SVR, "Running partition type %d subtype %d (offset 0x%lX)", running->type, running->subtype, running->address);
-            */
+         
             if (update_partition == NULL) {
                 ESP_LOGI(LOG_TAG_GATT_SVR, "update_partition is NULL!!");
                 vTaskDelay(2000 / portTICK_PERIOD_MS);

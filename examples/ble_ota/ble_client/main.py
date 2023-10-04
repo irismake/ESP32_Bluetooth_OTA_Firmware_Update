@@ -145,5 +145,5 @@ async def send_ota(file_path):
 
 
 if __name__ == '__main__':
-    asyncio.run(send_ota("C:/Users/iris3/esp/examples/ble_ota/ble_client/blink.bin"))
+    asyncio.run(send_ota("C:/Users/iris3/esp32/examples/ble_ota/ble_client/blink.bin"))
 

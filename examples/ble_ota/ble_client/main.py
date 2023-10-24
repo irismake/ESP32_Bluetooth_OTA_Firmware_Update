@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-import hashlib  # hashlib 모듈 추가
+import hashlib 
 from bleak import BleakClient, BleakScanner
 
 

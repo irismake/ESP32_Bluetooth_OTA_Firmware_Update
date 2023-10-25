@@ -39,27 +39,24 @@ esp_err_t read_file_and_execute() {
     ESP_LOGI(TAG, "File size: %ld bytes", file_size);
 
     if (file_size > 0) {
-        // 여러 작은 조각으로 파일 읽기
         char buffer[CHUNK_SIZE];
+        char* file_data = (char*)malloc(file_size);
+
+        if (!file_data) {
+            ESP_LOGE(TAG, "메모리 할당 실패");
+            fclose(fileRead);
+            return ESP_ERR_NO_MEM;
+        }
+
         size_t totalBytesRead = 0;
-        char* file_data = NULL;
+        size_t bytesRead;
 
         while (totalBytesRead < file_size) {
             size_t bytesToRead = (file_size - totalBytesRead) < CHUNK_SIZE
                 ? (file_size - totalBytesRead) : CHUNK_SIZE;
 
-            free(file_data);
+            bytesRead = fread(buffer, 1, bytesToRead, fileRead);
 
-            file_data = (char*)malloc(bytesToRead);
-
-           
-            if (!file_data) {
-                ESP_LOGE(TAG, "메모리 할당 실패");
-                fclose(fileRead);
-                return ESP_ERR_NO_MEM;
-            }
-
-            size_t bytesRead = fread(buffer, 1, bytesToRead, fileRead);
             if (bytesRead != bytesToRead) {
                 ESP_LOGE(TAG, "파일 읽기 실패");
                 free(file_data);
